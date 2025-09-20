@@ -53,6 +53,9 @@ class SchedulingGeneticAlgorithm:
                 "utilization_waste": 1,
                 "student_overload": 300,
                 "task_relation": 200,
+                "required_night_penalty": 500,  # 新增：必修课夜间惩罚
+                "required_weekend_penalty": 300,  # 新增：必修课周末惩罚
+                "elective_prime_time_penalty": 50,  # 新增：选修课占用黄金时段惩罚
             },
         }
 
@@ -85,7 +88,7 @@ class SchedulingGeneticAlgorithm:
         def priority_key(task):
             offering = task.offering
             if not offering:
-                return (2, 0, 0)  # 默认优先级
+                return (2, 0, 0, 0)  # 默认优先级
 
             # 课程性质优先级
             nature_priority = {
@@ -93,6 +96,9 @@ class SchedulingGeneticAlgorithm:
                 CourseNature.REQUIRED: 1,  # 必修中等
                 CourseNature.ELECTIVE: 2,  # 选修最低
             }
+
+            # 课时长度优先级（越长的课程越优先，避免时间块被短课程占用）
+            slots_priority = -task.slots_count  # 负号表示降序，4节>3节>2节
 
             # 学生人数（越多优先级越高）
             student_count = task.student_count or 0
@@ -103,12 +109,13 @@ class SchedulingGeneticAlgorithm:
 
             return (
                 nature_priority.get(offering.course_nature, 2),
+                slots_priority,  # 课时长度优先级（新增）
                 -student_count,  # 负号表示降序
                 -total_slots,  # 负号表示降序
             )
 
         sorted_tasks = sorted(tasks, key=priority_key)
-        logger.info("任务优先级排序完成")
+        logger.info("任务优先级排序完成：长课程优先，必修课优先")
         return sorted_tasks
 
     def _build_teacher_blackouts(self) -> Dict[str, Set[Tuple[int, int]]]:
@@ -187,13 +194,63 @@ class SchedulingGeneticAlgorithm:
         # 获取有效时间块
         valid_slots = get_valid_time_slots(task.slots_count)
 
+        # 根据课程性质确定时间偏好
+        preferred_weekdays = self._get_preferred_weekdays(task)
+        preferred_time_slots = self._get_preferred_time_slots(task, valid_slots)
+
         # 尝试多次找到可行的安排
-        max_attempts = 100
-        for attempt in range(max_attempts):
+        max_attempts = 200  # 增加尝试次数
+
+        # 首先尝试偏好时间
+        for attempt in range(max_attempts // 2):
             # 随机选择教师
             teacher_id = random.choice(task.teachers)
 
-            # 随机选择时间
+            # 优先选择偏好的时间
+            weekday = random.choice(preferred_weekdays)
+            start_slot, _ = random.choice(preferred_time_slots)
+
+            # 检查周四下午限制
+            if weekday == 4 and start_slot >= 6:  # 周四下午
+                continue
+
+            # 检查教师黑名单时间
+            if self._violates_teacher_blackout(
+                teacher_id, weekday, start_slot, task.slots_count
+            ):
+                continue
+
+            # 检查时间冲突
+            if self._has_time_conflict(
+                teacher_id,
+                task.classes,
+                weekday,
+                start_slot,
+                task.slots_count,
+                teacher_schedule,
+                class_schedule,
+            ):
+                continue
+
+            # 选择合适的教室
+            classroom = self._select_classroom(
+                task, weekday, start_slot, classroom_schedule
+            )
+            if classroom:
+                return Gene(
+                    task.task_id,
+                    teacher_id,
+                    classroom.classroom_id,
+                    weekday,
+                    start_slot,
+                )
+
+        # 如果偏好时间无法安排，尝试所有可能时间
+        for attempt in range(max_attempts // 2):
+            # 随机选择教师
+            teacher_id = random.choice(task.teachers)
+
+            # 随机选择时间（包括非偏好时间）
             weekday = random.randint(1, 7)
             start_slot, _ = random.choice(valid_slots)
 
@@ -234,13 +291,47 @@ class SchedulingGeneticAlgorithm:
 
         # 如果无法找到可行安排，返回一个随机安排（会在适应度函数中被惩罚）
         teacher_id = random.choice(task.teachers)
-        weekday = random.randint(1, 5)  # 避开周末
-        start_slot, _ = random.choice(valid_slots)
+        weekday = random.choice(preferred_weekdays)
+        start_slot, _ = random.choice(preferred_time_slots)
         classroom = random.choice(self.classrooms)
 
         return Gene(
             task.task_id, teacher_id, classroom.classroom_id, weekday, start_slot
         )
+
+    def _get_preferred_weekdays(self, task: TeachingTask) -> List[int]:
+        """根据课程性质获取偏好的星期"""
+        offering = task.offering
+        if not offering:
+            return list(range(1, 6))  # 默认工作日
+
+        # 必修课和通识课优先安排在周一到周五
+        if offering.course_nature in [CourseNature.REQUIRED, CourseNature.GENERAL]:
+            return list(range(1, 6))  # 周一到周五
+        else:
+            # 选修课可以安排在任何时间，包括周末
+            return list(range(1, 8))  # 周一到周日
+
+    def _get_preferred_time_slots(
+        self, task: TeachingTask, valid_slots: List[tuple]
+    ) -> List[tuple]:
+        """根据课程性质获取偏好的时间段"""
+        offering = task.offering
+        if not offering:
+            return valid_slots
+
+        # 白天时间块（不包括晚上11-13节）
+        daytime_slots = [slot for slot in valid_slots if slot[0] <= 10]
+
+        # 必修课和通识课优先安排在白天
+        if offering.course_nature in [CourseNature.REQUIRED, CourseNature.GENERAL]:
+            if daytime_slots:
+                return daytime_slots
+            else:
+                return valid_slots  # 如果没有白天时间块，使用所有时间块
+        else:
+            # 选修课可以安排在任何时间
+            return valid_slots
 
     def _violates_teacher_blackout(
         self, teacher_id: str, weekday: int, start_slot: int, slots_count: int
@@ -441,6 +532,9 @@ class SchedulingGeneticAlgorithm:
         # 学生负荷
         penalty += self._check_student_overload(class_schedule)
 
+        # 课程时段偏好（新增）
+        penalty += self._check_course_time_preference(individual)
+
         return penalty
 
     def _check_teacher_preferences(self, individual: List[Gene]) -> float:
@@ -580,6 +674,38 @@ class SchedulingGeneticAlgorithm:
                     penalty += self.config["penalty_scores"]["student_overload"] * (
                         count - 8
                     )
+
+        return penalty
+
+    def _check_course_time_preference(self, individual: List[Gene]) -> float:
+        """检查课程时段偏好（新增）"""
+        penalty = 0
+
+        for gene in individual:
+            task = self.task_dict[gene.task_id]
+            offering = task.offering
+
+            if not offering:
+                continue
+
+            # 检查必修课和通识课是否被安排在晚上（11-13节）
+            if offering.course_nature in [CourseNature.REQUIRED, CourseNature.GENERAL]:
+                if gene.start_slot >= 11:  # 晚上时段
+                    # 必修课在晚上的惩罚比较重
+                    penalty += self.config["penalty_scores"]["required_night_penalty"]
+                elif gene.start_slot >= 6 and gene.week_day in [6, 7]:  # 周末下午
+                    # 必修课在周末的惩罚
+                    penalty += self.config["penalty_scores"]["required_weekend_penalty"]
+
+            # 检查选修课是否过度占用黄金时段（上午和下午前半段）
+            elif offering.course_nature == CourseNature.ELECTIVE:
+                if gene.start_slot <= 5 or (
+                    gene.start_slot >= 6 and gene.start_slot <= 8
+                ):
+                    # 选修课占用黄金时段的轻微惩罚
+                    penalty += self.config["penalty_scores"][
+                        "elective_prime_time_penalty"
+                    ]
 
         return penalty
 
