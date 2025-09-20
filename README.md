@@ -31,7 +31,7 @@ pip install pymysql
 ## 数据库配置
 
 1. 确保 MySQL 服务正在运行
-2. 创建数据库 `paike2`
+2. 创建数据库 `paike-c`
 3. 执行提供的 SQL 脚本创建表结构
 4. 设置环境变量（可选）：
 
@@ -40,13 +40,13 @@ pip install pymysql
 $env:DB_HOST="localhost"
 $env:DB_USER="root"
 $env:DB_PASSWORD="123456"
-$env:DB_NAME="paike2"
+$env:DB_NAME="paike-c"
 
 # Linux/Mac
 export DB_HOST="localhost"
 export DB_USER="root"
 export DB_PASSWORD="123456"
-export DB_NAME="paike2"
+export DB_NAME="paike-c"
 ```
 
 ## 快速开始
