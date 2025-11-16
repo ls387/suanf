@@ -35,7 +35,31 @@ class SchedulingGeneticAlgorithm:
         self._build_lookup_tables()
 
     def _default_config(self) -> Dict:
-        """默认配置"""
+        """默认配置
+
+        约束与惩罚说明（硬约束 / 软约束）：
+
+        硬约束（违反会被大幅扣分，相当于不可接受）：
+        - teacher_conflict: 教师时间冲突
+        - class_conflict: 班级时间冲突
+        - classroom_conflict: 教室时间冲突
+        - capacity_violation: 教室容量不足
+        - blackout_violation: 教师黑名单时间上课
+        - feature_violation: 教室不满足课程必须的设施
+        - thursday_afternoon: 周四下午（第6节及以后）禁止排课
+        - campus_commute: 同一教师一天跨多个校区上课
+
+        软约束（违反会按权重扣分，用来“引导”更优方案）：
+        - teacher_preference: 未满足教师偏好时间段
+        - classroom_continuity: 连续课程未在同一教室
+        - utilization_waste: 教室容量浪费（教室太大、学生太少）
+        - student_overload: 单个班级某天课时数过多
+        - task_relation: 任务关系约束（当前未实际启用，仅预留）
+        - required_night_penalty: 必修/通识课安排在晚上 11-13 节
+        - required_weekend_penalty: 必修/通识课安排在周末下午（叠加在 weekend_penalty 之上）
+        - elective_prime_time_penalty: 选修课占用“黄金时段”（上午和下午前半段）
+        - weekend_penalty: 任何课程安排在周六/周日的基础惩罚
+        """
         return {
             "population_size": 100,
             "generations": 200,
@@ -53,8 +77,9 @@ class SchedulingGeneticAlgorithm:
                 "blackout_violation": -5000,
                 "feature_violation": -5000,
                 "thursday_afternoon": -5000,
+                # 校区通勤现在视为硬约束（一天多个校区代价很大）
+                "campus_commute": -5000,
                 "teacher_preference": 100,
-                "campus_commute": 200,
                 "classroom_continuity": 150,
                 "utilization_waste": 1,
                 "student_overload": 300,
@@ -62,6 +87,7 @@ class SchedulingGeneticAlgorithm:
                 "required_night_penalty": 500,  # 新增：必修课夜间惩罚
                 "required_weekend_penalty": 300,  # 新增：必修课周末惩罚
                 "elective_prime_time_penalty": 50,  # 新增：选修课占用黄金时段惩罚
+                "weekend_penalty": 200,  # 新增：所有课程安排到周末的基础惩罚
             },
         }
 
@@ -432,7 +458,13 @@ class SchedulingGeneticAlgorithm:
             class_schedule[class_id].update(time_slots)
 
     def fitness(self, individual: List[Gene]) -> float:
-        """计算适应度函数"""
+        """计算适应度函数
+
+        总体策略：
+        1. 先计算硬约束惩罚（_check_hard_constraints）：只要出现严重冲突，分数会非常低；
+        2. 如果硬约束分数低于阈值（例如大量冲突），直接返回，避免浪费时间；
+        3. 在硬约束基础上再叠加软约束惩罚（_check_soft_constraints），用于微调解。
+        """
         score = 0
 
         # 构建时间占用表
@@ -475,10 +507,21 @@ class SchedulingGeneticAlgorithm:
         class_schedule: Dict,
         classroom_schedule: Dict,
     ) -> float:
-        """检查硬约束"""
+        """检查硬约束
+
+        对应的硬约束包括：
+        - 教师时间冲突（teacher_conflict）
+        - 班级时间冲突（class_conflict）
+        - 教室时间冲突（classroom_conflict）
+        - 教室容量不足（capacity_violation）
+        - 教室设施不满足必需特征（feature_violation）
+        - 教师黑名单时间上课（blackout_violation）
+        - 周四下午上课（thursday_afternoon）
+        - 教师一天跨多个校区上课（campus_commute）
+        """
         penalty = 0
 
-        # 检查时间冲突
+        # 检查时间冲突（教师 / 班级 / 教室 三类硬约束）
         for schedule_dict, conflict_type in [
             (teacher_schedule, "teacher_conflict"),
             (class_schedule, "class_conflict"),
@@ -488,7 +531,7 @@ class SchedulingGeneticAlgorithm:
                 if len(time_list) != len(set(time_list)):
                     penalty += self.config["penalty_scores"][conflict_type]
 
-        # 检查其他硬约束
+        # 检查其他硬约束：容量、设施、黑名单、周四下午、校区通勤
         for gene in individual:
             task = self.task_dict[gene.task_id]
 
@@ -511,6 +554,31 @@ class SchedulingGeneticAlgorithm:
             if gene.week_day == 4 and gene.start_slot >= 6:
                 penalty += self.config["penalty_scores"]["thursday_afternoon"]
 
+        # 检查校区通勤（现在视为硬约束）：同一教师同一天涉及多个校区
+        teacher_daily_campuses = defaultdict(lambda: defaultdict(set))
+
+        for gene in individual:
+            classroom = self.data["classrooms"][gene.classroom_id]
+            campus_id = classroom.campus_id
+
+            # 判断时段（上午：1-5，下午：6-10，晚上：11-13）
+            if gene.start_slot <= 5:
+                period = "morning"
+            elif gene.start_slot <= 10:
+                period = "afternoon"
+            else:
+                period = "evening"
+
+            teacher_daily_campuses[gene.teacher_id][gene.week_day].add(
+                (period, campus_id)
+            )
+
+        for teacher_id, daily_campuses in teacher_daily_campuses.items():
+            for weekday, period_campuses in daily_campuses.items():
+                campuses = {campus_id for _, campus_id in period_campuses}
+                if len(campuses) > 1:
+                    penalty += self.config["penalty_scores"]["campus_commute"]
+
         return penalty
 
     def _check_soft_constraints(
@@ -520,14 +588,19 @@ class SchedulingGeneticAlgorithm:
         class_schedule: Dict,
         classroom_schedule: Dict,
     ) -> float:
-        """检查软约束"""
+        """检查软约束
+
+        对应的软约束包括：
+        - 教师时间偏好（_check_teacher_preferences）
+        - 连续课程是否在同一教室（_check_classroom_continuity）
+        - 教室容量利用率（_check_utilization_waste）
+        - 学生每日课时负荷（_check_student_overload）
+        - 课程时段偏好与周末惩罚（_check_course_time_preference）
+        """
         penalty = 0
 
         # 教师偏好
         penalty += self._check_teacher_preferences(individual)
-
-        # 校区通勤
-        penalty += self._check_campus_commute(individual)
 
         # 连堂课同教室
         penalty += self._check_classroom_continuity(individual)
@@ -544,7 +617,11 @@ class SchedulingGeneticAlgorithm:
         return penalty
 
     def _check_teacher_preferences(self, individual: List[Gene]) -> float:
-        """检查教师偏好"""
+        """检查教师偏好（软约束）
+
+        - 对教师声明为“避免”的时间段，若课程落入其中，则按照配置中的 penalty_score 直接扣分；
+        - 如果教师声明了“偏好”时间段，而课程完全不在这些偏好块内，则额外扣一次 teacher_preference。
+        """
         penalty = 0
 
         for gene in individual:
@@ -580,7 +657,11 @@ class SchedulingGeneticAlgorithm:
         return penalty
 
     def _check_campus_commute(self, individual: List[Gene]) -> float:
-        """检查校区通勤"""
+        """检查校区通勤（软约束）
+
+        - 按教师 + 日期统计当天涉及的校区数量；
+        - 如果同一天涉及多个校区，则按 (校区数 - 1) * campus_commute 扣分，鼓励同一教师当天尽量固定在一个校区。
+        """
         penalty = 0
 
         # 按教师和日期分组
@@ -618,7 +699,11 @@ class SchedulingGeneticAlgorithm:
         return penalty
 
     def _check_classroom_continuity(self, individual: List[Gene]) -> float:
-        """检查连堂课同教室"""
+        """检查连堂课同教室（软约束）
+
+        - 对同一教师同一天相邻的课程，如果是连续节次但教室不同，则按 classroom_continuity 扣分，
+          鼓励连续课程在同一教室上课，减少走动。
+        """
         penalty = 0
 
         # 按教师和日期分组
@@ -652,7 +737,11 @@ class SchedulingGeneticAlgorithm:
         return penalty
 
     def _check_utilization_waste(self, individual: List[Gene]) -> float:
-        """检查教室利用率"""
+        """检查教室利用率（软约束）
+
+        - 对于每一门课，计算教室容量 - 学生人数，如果有“空位”，乘以 utilization_waste 扣分；
+        - 鼓励把大班放到大教室，小班放到小教室，提高利用率。
+        """
         penalty = 0
 
         for gene in individual:
@@ -666,7 +755,12 @@ class SchedulingGeneticAlgorithm:
         return penalty
 
     def _check_student_overload(self, class_schedule: Dict) -> float:
-        """检查学生负荷"""
+        """检查学生负荷（软约束）
+
+        - 按班级 + 日期统计一天的总节数；
+        - 超过 8 节的部分，每多 1 节，按 student_overload 扣分，
+          防止学生某一天课太多、过于疲惫。
+        """
         penalty = 0
 
         for class_id, time_list in class_schedule.items():
@@ -684,7 +778,13 @@ class SchedulingGeneticAlgorithm:
         return penalty
 
     def _check_course_time_preference(self, individual: List[Gene]) -> float:
-        """检查课程时段偏好（新增）"""
+        """检查课程时段偏好与周末惩罚（软约束）
+
+        - weekend_penalty: 所有课程在周六/周日都会被扣一次基础分；
+        - required_night_penalty: 必修 / 通识课如果安排在晚上 11-13 节，额外扣分；
+        - required_weekend_penalty: 必修 / 通识课在周末下午（6 节以后）再叠加一次惩罚；
+        - elective_prime_time_penalty: 选修课如果占用上午或下午前半段（黄金时段），会有轻微惩罚。
+        """
         penalty = 0
 
         for gene in individual:
@@ -694,13 +794,17 @@ class SchedulingGeneticAlgorithm:
             if not offering:
                 continue
 
+            # 周末通用惩罚：任何课程安排在周六/周日都会有基础惩罚
+            if gene.week_day in [6, 7]:
+                penalty += self.config["penalty_scores"]["weekend_penalty"]
+
             # 检查必修课和通识课是否被安排在晚上（11-13节）
             if offering.course_nature in [CourseNature.REQUIRED, CourseNature.GENERAL]:
                 if gene.start_slot >= 11:  # 晚上时段
                     # 必修课在晚上的惩罚比较重
                     penalty += self.config["penalty_scores"]["required_night_penalty"]
                 elif gene.start_slot >= 6 and gene.week_day in [6, 7]:  # 周末下午
-                    # 必修课在周末的惩罚
+                    # 必修课在周末的额外惩罚（在通用周末惩罚基础上再叠加）
                     penalty += self.config["penalty_scores"]["required_weekend_penalty"]
 
             # 检查选修课是否过度占用黄金时段（上午和下午前半段）
