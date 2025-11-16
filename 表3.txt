@@ -1,0 +1,276 @@
+CREATE TABLE campuses (
+    campus_id VARCHAR(20) PRIMARY KEY COMMENT '校区编号',
+    campus_name VARCHAR(100) NOT NULL UNIQUE COMMENT '校区名称',
+    address TEXT COMMENT '地址',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- 2. 院系表
+CREATE TABLE departments (
+    department_id VARCHAR(20) PRIMARY KEY COMMENT '院系编号',
+    department_name VARCHAR(100) NOT NULL UNIQUE COMMENT '院系名称',
+    campus_id VARCHAR(20) COMMENT '主要所在校区',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (campus_id) REFERENCES campuses(campus_id) ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- 3. 专业表
+CREATE TABLE majors (
+    major_id VARCHAR(20) PRIMARY KEY COMMENT '专业编号',
+    major_name VARCHAR(100) NOT NULL COMMENT '专业名称',
+    department_id VARCHAR(20) NOT NULL COMMENT '所属院系ID',
+    notes TEXT COMMENT '备注',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 4. 班级表 (行政班)
+CREATE TABLE classes (
+    class_id VARCHAR(20) PRIMARY KEY COMMENT '行政班编号',
+    class_name VARCHAR(100) NOT NULL UNIQUE COMMENT '行政班名称',
+    grade INT NOT NULL COMMENT '年级 (例如 2023)',
+    student_count INT COMMENT '班级人数',
+    major_id VARCHAR(20) NOT NULL COMMENT '专业编号',
+    education_system INT COMMENT '学制 (例如 4)',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (major_id) REFERENCES majors(major_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 5. 教师表
+CREATE TABLE teachers (
+    teacher_id VARCHAR(20) PRIMARY KEY COMMENT '教师编号',
+    teacher_name VARCHAR(100) NOT NULL COMMENT '教师名称',
+    department_id VARCHAR(20) NOT NULL COMMENT '所属院系ID',
+    gender ENUM('男', '女', '未知') DEFAULT '未知' COMMENT '性别',
+    is_external BOOLEAN DEFAULT FALSE COMMENT '是否外聘',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 6. 课程目录表
+CREATE TABLE courses (
+    course_id VARCHAR(20) PRIMARY KEY COMMENT '课程编号',
+    course_name VARCHAR(100) NOT NULL COMMENT '课程名称',
+    credits DECIMAL(3, 1) NOT NULL COMMENT '学分',
+    total_hours INT NOT NULL COMMENT '总学时',
+    notes TEXT COMMENT '备注',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- 7. 教室设施/特征表 (解决场景4)
+CREATE TABLE classroom_features (
+    feature_id VARCHAR(20) PRIMARY KEY,
+    feature_name VARCHAR(100) NOT NULL UNIQUE COMMENT '特征名称 (例如: 投影仪, 高性能GPU, 录播功能)',
+    description TEXT
+);
+
+-- 8. 教室表
+CREATE TABLE classrooms (
+    classroom_id VARCHAR(20) PRIMARY KEY COMMENT '教室编号',
+    classroom_name VARCHAR(100) COMMENT '教室名称 (例如 N101)',
+    building_name VARCHAR(100) COMMENT '教学楼名称',
+    campus_id VARCHAR(20) NOT NULL COMMENT '所在校区',
+    classroom_type VARCHAR(50) COMMENT '教室类型 (例如: 普通多媒体, 计算机机房, 实验室)',
+    capacity INT NOT NULL COMMENT '最大容纳人数',
+    is_available BOOLEAN DEFAULT TRUE COMMENT '是否可用',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (campus_id) REFERENCES campuses(campus_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 9. 教室-设施关联表 (M2M, 解决场景4)
+CREATE TABLE classroom_has_features (
+    classroom_id VARCHAR(20),
+    feature_id VARCHAR(20),
+    PRIMARY KEY (classroom_id, feature_id),
+    FOREIGN KEY (classroom_id) REFERENCES classrooms(classroom_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (feature_id) REFERENCES classroom_features(feature_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+
+-- =================================================================
+-- Section 2: 排课任务定义与约束 (Task Definition & Constraints)
+-- 这是系统的核心, 定义了"什么课"要被安排, 以及安排时需要满足的各种复杂约束
+-- =================================================================
+-- 10. 开课计划表 (优化后)
+CREATE TABLE course_offerings (
+    offering_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '开课计划的唯一ID',
+    semester VARCHAR(20) NOT NULL COMMENT '学年学期 (例如 2025-2026-1)',
+    course_id VARCHAR(20) NOT NULL COMMENT '课程编号',
+    course_nature ENUM('必修', '选修', '通识') DEFAULT '必修' COMMENT '课程性质',
+    student_count_estimate INT COMMENT '预估总上课人数',
+
+    -- 新增字段用于优化周次定义
+    start_week INT NOT NULL COMMENT '起始周',
+    end_week INT NOT NULL COMMENT '结束周',
+    week_pattern ENUM(
+        'CONTINUOUS', -- 连续周 (例如 1-16周)
+        'SINGLE',     -- 仅单周
+        'DOUBLE',     -- 仅双周
+        'CUSTOM'      -- 自定义 (此时需查询 offering_weeks 表)
+    ) NOT NULL DEFAULT 'CONTINUOUS',
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    INDEX idx_semester_course (semester, course_id)
+);
+-- 11. 开课计划-周次详情表 (解决场景3)
+CREATE TABLE offering_weeks (
+    offering_id INT,
+    week_number INT,
+    PRIMARY KEY (offering_id, week_number),
+    FOREIGN KEY (offering_id) REFERENCES course_offerings(offering_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT chk_week_number CHECK (week_number BETWEEN 1 AND 53)
+);
+
+-- 12. 开课计划-行政班关联表 (支持合班)
+CREATE TABLE offering_classes (
+    offering_id INT,
+    class_id VARCHAR(20),
+    PRIMARY KEY (offering_id, class_id),
+    FOREIGN KEY (offering_id) REFERENCES course_offerings(offering_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (class_id) REFERENCES classes(class_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 13. 开课计划-授课教师团队表 (解决场景2)
+CREATE TABLE offering_teachers (
+    offering_id INT,
+    teacher_id VARCHAR(20),
+    role VARCHAR(50) DEFAULT '主讲' COMMENT '角色 (例如: 主讲, 实验指导)',
+    start_week INT COMMENT '负责的开始周 (NULL为整学期)',
+    end_week INT COMMENT '负责的结束周 (NULL为整学期)',
+    PRIMARY KEY (offering_id, teacher_id),
+    FOREIGN KEY (offering_id) REFERENCES course_offerings(offering_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 14. 教学班/小组表 (解决场景5: 分班)
+CREATE TABLE teaching_groups (
+    group_id INT AUTO_INCREMENT PRIMARY KEY,
+    offering_id INT NOT NULL COMMENT '所属的开课计划',
+    group_name VARCHAR(100) NOT NULL COMMENT '教学班名称 (例如: 英语听说A班)',
+    student_count INT COMMENT '本组预估人数',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (offering_id) REFERENCES course_offerings(offering_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 15. 开课计划-设施要求表 (解决场景4)
+CREATE TABLE offering_requires_features (
+    offering_id INT,
+    feature_id VARCHAR(20),
+    is_mandatory BOOLEAN DEFAULT TRUE COMMENT '此设施是否为硬性要求',
+    PRIMARY KEY (offering_id, feature_id),
+    FOREIGN KEY (offering_id) REFERENCES course_offerings(offering_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (feature_id) REFERENCES classroom_features(feature_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 16. 教学任务次表 (定义每周的排课单元)
+CREATE TABLE teaching_tasks (
+    task_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '教学任务次的唯一ID',
+    offering_id INT NOT NULL COMMENT '关联的开课计划ID',
+    group_id INT COMMENT '关联的教学班ID (NULL表示面向整个Offering)',
+    task_sequence INT NOT NULL COMMENT '周内第几次课 (例如 1 或 2)',
+    slots_count INT NOT NULL COMMENT '本次课需连排的节数',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (offering_id) REFERENCES course_offerings(offering_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (group_id) REFERENCES teaching_groups(group_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    UNIQUE KEY uk_offering_group_sequence (offering_id, group_id, task_sequence)
+);
+
+-- 17. 教师禁止时间表 (硬约束)
+CREATE TABLE teacher_blackout_times (
+    blackout_id INT AUTO_INCREMENT PRIMARY KEY,
+    teacher_id VARCHAR(20) NOT NULL,
+    semester VARCHAR(20) NOT NULL,
+    weekday INT NOT NULL COMMENT '禁止星期(1-7)',
+    start_slot INT NOT NULL COMMENT '开始节次(1-13)',
+    end_slot INT NOT NULL COMMENT '结束节次(1-13)',
+    reason VARCHAR(200),
+    FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    INDEX idx_teacher_semester (teacher_id, semester)
+);
+
+-- 18. 教师偏好表 (修改后, 更结构化)
+-- 将 preference_value 拆分为具体的字段，避免字符串解析
+CREATE TABLE teacher_preferences (
+    preference_id INT AUTO_INCREMENT PRIMARY KEY,
+    offering_id INT NOT NULL COMMENT '关联的开课计划ID',
+    teacher_id VARCHAR(20) NOT NULL COMMENT '偏好所属的教师',
+    -- task_sequence INT COMMENT '此偏好应用于周内第几次课 (NULL为应用于所有次)',
+    
+    preference_type ENUM('PREFERRED', 'AVOIDED') NOT NULL COMMENT '偏好类型：偏好或避免',
+    
+    -- 将原 preference_value 拆分
+    weekday INT COMMENT '星期几 (1-7)',
+    start_slot INT COMMENT '开始节次 (1-13)',
+    end_slot INT COMMENT '结束节次 (1-13)',
+    
+    penalty_score INT DEFAULT 100 COMMENT '不满足此偏好时的惩罚分数 (软约束)',
+    
+    FOREIGN KEY (offering_id) REFERENCES course_offerings(offering_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    INDEX idx_teacher_offering (teacher_id, offering_id)
+);
+
+-- =================================================================
+-- Section 3: 排课结果与状态管理 (Scheduling Results & State Management)
+-- 存储算法的输出结果, 并对排课流程进行管理
+-- =================================================================
+
+-- 19. 排课方案/版本表 (解决问题5)
+CREATE TABLE schedule_versions (
+    version_id INT AUTO_INCREMENT PRIMARY KEY,
+    semester VARCHAR(20) NOT NULL,
+    version_name VARCHAR(100) NOT NULL COMMENT '方案名称 (例如: 2025秋季第一轮草案)',
+    status ENUM('draft', 'published', 'archived') DEFAULT 'draft' NOT NULL COMMENT '方案状态',
+    description TEXT,
+    created_by VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_semester_version_name (semester, version_name)
+);
+
+-- 20. 排课结果表
+CREATE TABLE schedules (
+    schedule_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '排课结果的唯一ID',
+    version_id INT NOT NULL COMMENT '所属的排课方案版本',
+    task_id INT NOT NULL COMMENT '关联到具体的教学任务次',
+    classroom_id VARCHAR(20) NOT NULL COMMENT '安排的教室ID',
+    week_day INT NOT NULL COMMENT '星期几 (1-7)',
+    start_slot INT NOT NULL COMMENT '开始节次 (1-13)',
+    end_slot INT NOT NULL COMMENT '结束节次 (1-13)',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (version_id) REFERENCES schedule_versions(version_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (task_id) REFERENCES teaching_tasks(task_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (classroom_id) REFERENCES classrooms(classroom_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    -- 核心唯一约束: 在同一个排课方案中, 一个时空点只能有一个安排
+    UNIQUE KEY uk_version_time_space (version_id, classroom_id, week_day, start_slot)
+);
+
+-- (新增) 任务关系约束表
+-- 用于定义同一开课计划下, 不同任务次之间的关联偏好 (软约束)
+CREATE TABLE task_relation_constraints (
+    constraint_id INT AUTO_INCREMENT PRIMARY KEY,
+    offering_id INT NOT NULL COMMENT '关联的开课计划',
+    task_sequence_a INT NOT NULL COMMENT '任务次A的序号 (例如 1)',
+    task_sequence_b INT NOT NULL COMMENT '任务次B的序号 (例如 2)',
+    
+    constraint_type ENUM(
+        'AVOID_CONSECUTIVE_DAYS', -- 避免连续两天
+        'REQUIRE_SAME_DAY',       -- 必须在同一天
+        'MIN_DAYS_APART'          -- 至少间隔几天
+    ) NOT NULL,
+    
+    constraint_value INT COMMENT '约束值 (例如 MIN_DAYS_APART 的值为 1)',
+    penalty_score INT DEFAULT 200 COMMENT '不满足此约束时的惩罚分数',
+    
+    FOREIGN KEY (offering_id) REFERENCES course_offerings(offering_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    UNIQUE KEY uk_offering_tasks_constraint (offering_id, task_sequence_a, task_sequence_b, constraint_type)
+);

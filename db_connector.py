@@ -115,6 +115,7 @@ class DataLoader:
             "teaching_tasks": self._load_teaching_tasks(semester),
             "teacher_blackout_times": self._load_teacher_blackout_times(semester),
             "teacher_preferences": self._load_teacher_preferences(),
+            "task_relations": self._load_task_relations(semester),
         }
 
         # 填充教学任务的详细信息
@@ -125,50 +126,52 @@ class DataLoader:
 
     def _load_campuses(self) -> Dict[str, Campus]:
         """加载校区数据"""
-        query = "SELECT * FROM campuses"
+        query = "SELECT campus_id, campus_name, address FROM campuses"
         rows = self.db.execute_query(query)
         return {row["campus_id"]: Campus(**row) for row in rows}
 
     def _load_departments(self) -> Dict[str, Department]:
         """加载院系数据"""
-        query = "SELECT * FROM departments"
+        query = "SELECT department_id, department_name, campus_id FROM departments"
         rows = self.db.execute_query(query)
         return {row["department_id"]: Department(**row) for row in rows}
 
     def _load_majors(self) -> Dict[str, Major]:
         """加载专业数据"""
-        query = "SELECT * FROM majors"
+        query = "SELECT major_id, major_name, department_id, notes FROM majors"
         rows = self.db.execute_query(query)
         return {row["major_id"]: Major(**row) for row in rows}
 
     def _load_classes(self) -> Dict[str, Class]:
         """加载班级数据"""
-        query = "SELECT * FROM classes"
+        query = "SELECT class_id, class_name, grade, student_count, major_id, education_system FROM classes"
         rows = self.db.execute_query(query)
         return {row["class_id"]: Class(**row) for row in rows}
 
     def _load_teachers(self) -> Dict[str, Teacher]:
         """加载教师数据"""
-        query = "SELECT * FROM teachers"
+        query = "SELECT teacher_id, teacher_name, department_id, gender, is_external FROM teachers"
         rows = self.db.execute_query(query)
         return {row["teacher_id"]: Teacher(**row) for row in rows}
 
     def _load_courses(self) -> Dict[str, Course]:
         """加载课程数据"""
-        query = "SELECT * FROM courses"
+        query = (
+            "SELECT course_id, course_name, credits, total_hours, notes FROM courses"
+        )
         rows = self.db.execute_query(query)
         return {row["course_id"]: Course(**row) for row in rows}
 
     def _load_classroom_features(self) -> Dict[str, ClassroomFeature]:
         """加载教室特征数据"""
-        query = "SELECT * FROM classroom_features"
+        query = "SELECT feature_id, feature_name, description FROM classroom_features"
         rows = self.db.execute_query(query)
         return {row["feature_id"]: ClassroomFeature(**row) for row in rows}
 
     def _load_classrooms(self) -> Dict[str, Classroom]:
         """加载教室数据（包含特征）"""
         # 加载基本教室信息
-        query = "SELECT * FROM classrooms WHERE is_available = TRUE"
+        query = "SELECT classroom_id, classroom_name, building_name, campus_id, classroom_type, capacity, is_available FROM classrooms WHERE is_available = TRUE"
         rows = self.db.execute_query(query)
         classrooms = {}
 
@@ -194,7 +197,7 @@ class DataLoader:
 
     def _load_course_offerings(self, semester: str) -> Dict[int, CourseOffering]:
         """加载开课计划数据"""
-        query = "SELECT * FROM course_offerings WHERE semester = %s"
+        query = "SELECT offering_id, semester, course_id, course_nature, student_count_estimate, start_week, end_week, week_pattern FROM course_offerings WHERE semester = %s"
         rows = self.db.execute_query(query, (semester,))
 
         offerings = {}
@@ -206,14 +209,14 @@ class DataLoader:
 
     def _load_teaching_groups(self) -> Dict[int, TeachingGroup]:
         """加载教学班数据"""
-        query = "SELECT * FROM teaching_groups"
+        query = "SELECT group_id, offering_id, group_name, student_count FROM teaching_groups"
         rows = self.db.execute_query(query)
         return {row["group_id"]: TeachingGroup(**row) for row in rows}
 
     def _load_teaching_tasks(self, semester: str) -> List[TeachingTask]:
         """加载教学任务数据"""
         query = """
-        SELECT tt.* 
+        SELECT tt.task_id, tt.offering_id, tt.group_id, tt.task_sequence, tt.slots_count
         FROM teaching_tasks tt
         JOIN course_offerings co ON tt.offering_id = co.offering_id
         WHERE co.semester = %s
@@ -224,13 +227,13 @@ class DataLoader:
 
     def _load_teacher_blackout_times(self, semester: str) -> List[TeacherBlackoutTime]:
         """加载教师禁止时间"""
-        query = "SELECT * FROM teacher_blackout_times WHERE semester = %s"
+        query = "SELECT blackout_id, teacher_id, semester, weekday, start_slot, end_slot, reason FROM teacher_blackout_times WHERE semester = %s"
         rows = self.db.execute_query(query, (semester,))
         return [TeacherBlackoutTime(**row) for row in rows]
 
     def _load_teacher_preferences(self) -> List[TeacherPreference]:
         """加载教师偏好"""
-        query = "SELECT * FROM teacher_preferences"
+        query = "SELECT preference_id, offering_id, teacher_id, preference_type, weekday, start_slot, end_slot, penalty_score FROM teacher_preferences"
         rows = self.db.execute_query(query)
 
         preferences = []
@@ -367,3 +370,21 @@ class DataLoader:
 
         self.db.execute_batch_insert(insert_query, params_list)
         logger.info(f"成功保存 {len(params_list)} 条排课结果")
+
+    def _load_task_relations(self, semester: str) -> List[TaskRelation]:
+        """加载任务关系约束"""
+        try:
+            query = """
+            SELECT tr.task_id, tr.related_task_id, tr.relation_type, 
+                   tr.time_gap, tr.same_day, tr.description
+            FROM task_relations tr
+            JOIN teaching_tasks tt ON tr.task_id = tt.task_id
+            JOIN course_offerings co ON tt.offering_id = co.offering_id
+            WHERE co.semester = %s AND tr.is_active = 1
+            """
+            rows = self.db.execute_query(query, (semester,))
+            return [TaskRelation(**row) for row in rows]
+        except Exception as e:
+            # 如果表不存在或其他错误，返回空列表
+            logger.warning(f"无法加载任务关系约束: {e}")
+            return []

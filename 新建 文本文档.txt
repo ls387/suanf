@@ -1,0 +1,591 @@
+utf8mb4 + utf8mb4_unicode_ci
+一、 设计理念与核心变更
+本版设计（V3）是基于您文档中详细的场景分析和问题反馈的直接成果。核心变更旨在解决V2版本及您原有设计中的结构性局限：
+1.	全面支持团队教学与分工: 引入了offering_teachers表，明确定义了授课团队，并允许为团队中每位教师指定不同的授课周次。
+2.	灵活的周次安排: 新增了offering_weeks表，彻底解决了单双周、非连续周等复杂排课需求，取代了原有的start_week/end_week模式。
+3.	结构化的特殊需求匹配: 引入了classroom_features（教室设施）及相关联的表，将模糊的文本要求转化为算法可以精确匹配的结构化数据。
+4.	原生支持分班教学: 新增了teaching_groups（教学班）表，允许将一个行政班拆分成多个教学单元进行独立排课。
+5.	引入排课版本与状态管理: 新增schedule_versions（排课方案）表，支持创建多个排课草案、发布最终版、归档历史版本，使排课成为一个可管理的工作流。
+6.	优化排课结果存储: schedules表不再存储具体的周次，大大减少了数据冗余，提高了查询和更新效率。一个排课记录代表一个在特定周次模式下（通过offering_weeks查询）的每周固定安排。
+二、 完整的SQL创建语句
+-- =================================================================
+-- Section 1: 基础信息实体 (Core Entities)
+-- 几乎不变, 作为系统的基础数据
+-- =================================================================
+
+-- 1. 校区表
+CREATE TABLE campuses (
+    campus_id VARCHAR(20) PRIMARY KEY COMMENT '校区编号',
+    campus_name VARCHAR(100) NOT NULL UNIQUE COMMENT '校区名称',
+    address TEXT COMMENT '地址',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- 2. 院系表
+CREATE TABLE departments (
+    department_id VARCHAR(20) PRIMARY KEY COMMENT '院系编号',
+    department_name VARCHAR(100) NOT NULL UNIQUE COMMENT '院系名称',
+    campus_id VARCHAR(20) COMMENT '主要所在校区',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (campus_id) REFERENCES campuses(campus_id) ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- 3. 专业表
+CREATE TABLE majors (
+    major_id VARCHAR(20) PRIMARY KEY COMMENT '专业编号',
+    major_name VARCHAR(100) NOT NULL COMMENT '专业名称',
+    department_id VARCHAR(20) NOT NULL COMMENT '所属院系ID',
+    notes TEXT COMMENT '备注',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 4. 班级表 (行政班)
+CREATE TABLE classes (
+    class_id VARCHAR(20) PRIMARY KEY COMMENT '行政班编号',
+    class_name VARCHAR(100) NOT NULL UNIQUE COMMENT '行政班名称',
+    grade INT NOT NULL COMMENT '年级 (例如 2023)',
+    student_count INT COMMENT '班级人数',
+    major_id VARCHAR(20) NOT NULL COMMENT '专业编号',
+    education_system INT COMMENT '学制 (例如 4)',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (major_id) REFERENCES majors(major_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 5. 教师表
+CREATE TABLE teachers (
+    teacher_id VARCHAR(20) PRIMARY KEY COMMENT '教师编号',
+    teacher_name VARCHAR(100) NOT NULL COMMENT '教师名称',
+    department_id VARCHAR(20) NOT NULL COMMENT '所属院系ID',
+    gender ENUM('男', '女', '未知') DEFAULT '未知' COMMENT '性别',
+    is_external BOOLEAN DEFAULT FALSE COMMENT '是否外聘',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 6. 课程目录表
+CREATE TABLE courses (
+    course_id VARCHAR(20) PRIMARY KEY COMMENT '课程编号',
+    course_name VARCHAR(100) NOT NULL COMMENT '课程名称',
+    credits DECIMAL(3, 1) NOT NULL COMMENT '学分',
+    total_hours INT NOT NULL COMMENT '总学时',
+    notes TEXT COMMENT '备注',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- 7. 教室设施/特征表 (解决场景4)
+CREATE TABLE classroom_features (
+    feature_id VARCHAR(20) PRIMARY KEY,
+    feature_name VARCHAR(100) NOT NULL UNIQUE COMMENT '特征名称 (例如: 投影仪, 高性能GPU, 录播功能)',
+    description TEXT
+);
+
+-- 8. 教室表
+CREATE TABLE classrooms (
+    classroom_id VARCHAR(20) PRIMARY KEY COMMENT '教室编号',
+    classroom_name VARCHAR(100) COMMENT '教室名称 (例如 N101)',
+    building_name VARCHAR(100) COMMENT '教学楼名称',
+    campus_id VARCHAR(20) NOT NULL COMMENT '所在校区',
+    classroom_type VARCHAR(50) COMMENT '教室类型 (例如: 普通多媒体, 计算机机房, 实验室)',
+    capacity INT NOT NULL COMMENT '最大容纳人数',
+    is_available BOOLEAN DEFAULT TRUE COMMENT '是否可用',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (campus_id) REFERENCES campuses(campus_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 9. 教室-设施关联表 (M2M, 解决场景4)
+CREATE TABLE classroom_has_features (
+    classroom_id VARCHAR(20),
+    feature_id VARCHAR(20),
+    PRIMARY KEY (classroom_id, feature_id),
+    FOREIGN KEY (classroom_id) REFERENCES classrooms(classroom_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (feature_id) REFERENCES classroom_features(feature_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+
+-- =================================================================
+-- Section 2: 排课任务定义与约束 (Task Definition & Constraints)
+-- 这是系统的核心, 定义了"什么课"要被安排, 以及安排时需要满足的各种复杂约束
+-- =================================================================
+
+-- 10. 开课计划表
+CREATE TABLE course_offerings (
+    offering_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '开课计划的唯一ID',
+    semester VARCHAR(20) NOT NULL COMMENT '学年学期 (例如 2025-2026-1)',
+    course_id VARCHAR(20) NOT NULL COMMENT '课程编号',
+    course_nature ENUM('必修', '选修', '通识') DEFAULT '必修' COMMENT '课程性质',
+    student_count_estimate INT COMMENT '预估总上课人数 (合班/分班后)',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    INDEX idx_semester_course (semester, course_id)
+);
+
+-- 11. 开课计划-周次详情表 (解决场景3)
+CREATE TABLE offering_weeks (
+    offering_id INT,
+    week_number INT,
+    PRIMARY KEY (offering_id, week_number),
+    FOREIGN KEY (offering_id) REFERENCES course_offerings(offering_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT chk_week_number CHECK (week_number BETWEEN 1 AND 53)
+);
+
+-- 12. 开课计划-行政班关联表 (支持合班)
+CREATE TABLE offering_classes (
+    offering_id INT,
+    class_id VARCHAR(20),
+    PRIMARY KEY (offering_id, class_id),
+    FOREIGN KEY (offering_id) REFERENCES course_offerings(offering_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (class_id) REFERENCES classes(class_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 13. 开课计划-授课教师团队表 (解决场景2)
+CREATE TABLE offering_teachers (
+    offering_id INT,
+    teacher_id VARCHAR(20),
+    role VARCHAR(50) DEFAULT '主讲' COMMENT '角色 (例如: 主讲, 实验指导)',
+    start_week INT COMMENT '负责的开始周 (NULL为整学期)',
+    end_week INT COMMENT '负责的结束周 (NULL为整学期)',
+    PRIMARY KEY (offering_id, teacher_id),
+    FOREIGN KEY (offering_id) REFERENCES course_offerings(offering_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 14. 教学班/小组表 (解决场景5: 分班)
+CREATE TABLE teaching_groups (
+    group_id INT AUTO_INCREMENT PRIMARY KEY,
+    offering_id INT NOT NULL COMMENT '所属的开课计划',
+    group_name VARCHAR(100) NOT NULL COMMENT '教学班名称 (例如: 英语听说A班)',
+    student_count INT COMMENT '本组预估人数',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (offering_id) REFERENCES course_offerings(offering_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 15. 开课计划-设施要求表 (解决场景4)
+CREATE TABLE offering_requires_features (
+    offering_id INT,
+    feature_id VARCHAR(20),
+    is_mandatory BOOLEAN DEFAULT TRUE COMMENT '此设施是否为硬性要求',
+    PRIMARY KEY (offering_id, feature_id),
+    FOREIGN KEY (offering_id) REFERENCES course_offerings(offering_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (feature_id) REFERENCES classroom_features(feature_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- 16. 教学任务次表 (定义每周的排课单元)
+CREATE TABLE teaching_tasks (
+    task_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '教学任务次的唯一ID',
+    offering_id INT NOT NULL COMMENT '关联的开课计划ID',
+    group_id INT COMMENT '关联的教学班ID (NULL表示面向整个Offering)',
+    task_sequence INT NOT NULL COMMENT '周内第几次课 (例如 1 或 2)',
+    slots_count INT NOT NULL COMMENT '本次课需连排的节数',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (offering_id) REFERENCES course_offerings(offering_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (group_id) REFERENCES teaching_groups(group_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    UNIQUE KEY uk_offering_group_sequence (offering_id, group_id, task_sequence)
+);
+
+-- 17. 教师禁止时间表 (硬约束)
+CREATE TABLE teacher_blackout_times (
+    blackout_id INT AUTO_INCREMENT PRIMARY KEY,
+    teacher_id VARCHAR(20) NOT NULL,
+    semester VARCHAR(20) NOT NULL,
+    weekday INT NOT NULL COMMENT '禁止星期(1-7)',
+    start_slot INT NOT NULL COMMENT '开始节次(1-13)',
+    end_slot INT NOT NULL COMMENT '结束节次(1-13)',
+    reason VARCHAR(200),
+    FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    INDEX idx_teacher_semester (teacher_id, semester)
+);
+
+-- 18. 教师偏好表 (修改后, 更结构化)
+-- 将 preference_value 拆分为具体的字段，避免字符串解析
+CREATE TABLE teacher_preferences (
+    preference_id INT AUTO_INCREMENT PRIMARY KEY,
+    offering_id INT NOT NULL COMMENT '关联的开课计划ID',
+    teacher_id VARCHAR(20) NOT NULL COMMENT '偏好所属的教师',
+    -- task_sequence INT COMMENT '此偏好应用于周内第几次课 (NULL为应用于所有次)',
+    
+    preference_type ENUM('PREFERRED', 'AVOIDED') NOT NULL COMMENT '偏好类型：偏好或避免',
+    
+    -- 将原 preference_value 拆分
+    weekday INT COMMENT '星期几 (1-7)',
+    start_slot INT COMMENT '开始节次 (1-13)',
+    end_slot INT COMMENT '结束节次 (1-13)',
+    
+    penalty_score INT DEFAULT 100 COMMENT '不满足此偏好时的惩罚分数 (软约束)',
+    
+    FOREIGN KEY (offering_id) REFERENCES course_offerings(offering_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    INDEX idx_teacher_offering (teacher_id, offering_id)
+);
+
+-- =================================================================
+-- Section 3: 排课结果与状态管理 (Scheduling Results & State Management)
+-- 存储算法的输出结果, 并对排课流程进行管理
+-- =================================================================
+
+-- 19. 排课方案/版本表 (解决问题5)
+CREATE TABLE schedule_versions (
+    version_id INT AUTO_INCREMENT PRIMARY KEY,
+    semester VARCHAR(20) NOT NULL,
+    version_name VARCHAR(100) NOT NULL COMMENT '方案名称 (例如: 2025秋季第一轮草案)',
+    status ENUM('draft', 'published', 'archived') DEFAULT 'draft' NOT NULL COMMENT '方案状态',
+    description TEXT,
+    created_by VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_semester_version_name (semester, version_name)
+);
+
+-- 20. 排课结果表
+CREATE TABLE schedules (
+    schedule_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '排课结果的唯一ID',
+    version_id INT NOT NULL COMMENT '所属的排课方案版本',
+    task_id INT NOT NULL COMMENT '关联到具体的教学任务次',
+    classroom_id VARCHAR(20) NOT NULL COMMENT '安排的教室ID',
+    week_day INT NOT NULL COMMENT '星期几 (1-7)',
+    start_slot INT NOT NULL COMMENT '开始节次 (1-13)',
+    end_slot INT NOT NULL COMMENT '结束节次 (1-13)',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (version_id) REFERENCES schedule_versions(version_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (task_id) REFERENCES teaching_tasks(task_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (classroom_id) REFERENCES classrooms(classroom_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    -- 核心唯一约束: 在同一个排课方案中, 一个时空点只能有一个安排
+    UNIQUE KEY uk_version_time_space (version_id, classroom_id, week_day, start_slot)
+);
+
+-- (新增) 任务关系约束表
+-- 用于定义同一开课计划下, 不同任务次之间的关联偏好 (软约束)
+CREATE TABLE task_relation_constraints (
+    constraint_id INT AUTO_INCREMENT PRIMARY KEY,
+    offering_id INT NOT NULL COMMENT '关联的开课计划',
+    task_sequence_a INT NOT NULL COMMENT '任务次A的序号 (例如 1)',
+    task_sequence_b INT NOT NULL COMMENT '任务次B的序号 (例如 2)',
+    
+    constraint_type ENUM(
+        'AVOID_CONSECUTIVE_DAYS', -- 避免连续两天
+        'REQUIRE_SAME_DAY',       -- 必须在同一天
+        'MIN_DAYS_APART'          -- 至少间隔几天
+    ) NOT NULL,
+    
+    constraint_value INT COMMENT '约束值 (例如 MIN_DAYS_APART 的值为 1)',
+    penalty_score INT DEFAULT 200 COMMENT '不满足此约束时的惩罚分数',
+    
+    FOREIGN KEY (offering_id) REFERENCES course_offerings(offering_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    UNIQUE KEY uk_offering_tasks_constraint (offering_id, task_sequence_a, task_sequence_b, constraint_type)
+);
+
+
+
+概览表
+类别	表名	主要作用
+1. 准备数据	campuses, departments, majors, classes, teachers, courses, classrooms, classroom_features, classroom_has_features	核心基础信息：定义了学校的人、物、地等静态实体。
+	course_offerings, offering_weeks, offering_classes, offering_teachers, teaching_groups, offering_requires_features, teaching_tasks	学期排课任务：定义了本学期“要排什么课”。
+	teacher_blackout_times, teacher_preferences, (以及建议的 task_relation_constraints)	排课约束条件：定义了排课时必须遵守的硬约束和需要优化的软约束。
+2. 过程管理	schedule_versions	排课版本控制：创建、管理和发布不同的排课方案。
+3. 结果存储	schedules	最终课表：存储算法计算出的最终排课结果。
+________________________________________
+详细分类解析
+第一类：需要您准备好的数据 (Preparation Data)
+这些是您的遗传算法运行的全部输入。在启动排课程序之前，这些表必须包含完整且准确的数据。可以进一步细分为三个子类：
+A. 核心基础实体 (基本不变的数据)
+这些数据相对稳定，通常一个学期内不会有大的变动。
+1.	campuses (校区表)
+2.	departments (院系表)
+3.	majors (专业表)
+4.	classes (行政班表)
+5.	teachers (教师表)
+6.	courses (课程目录表)
+7.	classroom_features (教室设施表)
+8.	classrooms (教室表)
+9.	classroom_has_features (教室-设施关联表)
+B. 本学期的排课任务定义 (每个学期都需要重新准备)
+这是排课工作的核心，定义了“为谁、上什么课、由谁上、上几周”等。
+1.	course_offerings (开课计划表): 排课的起点。必须定义本学期要开设的所有课程。
+2.	offering_weeks (周次详情表): 明确每门课具体在哪几周上。
+3.	offering_classes (行政班关联表): 明确每门课由哪些班级合班上。
+4.	offering_teachers (授课教师团队表): 明确每门课由哪些老师教，以及他们负责的周次。
+5.	teaching_groups (教学班/小组表): 如果有分班需求，需要在这里定义好小组。
+6.	offering_requires_features (设施要求表): 定义课程对教室硬件的特殊要求。
+7.	teaching_tasks (教学任务次表): 算法排课的原子单位。必须将每个开课计划分解成每周需要排的具体“课次”。
+C. 排课的约束条件 (每个学期都可能不同)
+这些是遗传算法适应度函数（Fitness Function）的主要评分依据。
+1.	teacher_blackout_times (教师禁止时间表): 定义了硬约束。
+2.	teacher_preferences (教师偏好表): 定义了软约束。
+3.	(我建议的) task_relation_constraints (任务关系约束表): 同样是重要的软约束。
+第二类：代码运行中创建与管理的数据 (Process Management)
+这类数据是连接“准备”和“结果”的桥梁，负责管理整个排课流程。
+1.	schedule_versions (排课方案/版本表):
+o	运行前: 您需要在系统中创建一个新的排课版本记录，例如 version_name='2025秋季第一轮草案', status='draft'。这会生成一个 version_id。
+o	运行中: 您的Python程序会接收这个 version_id 作为参数，所有排课结果都将与这个ID关联。
+o	运行后: 当您对结果满意时，可以手动或通过程序将该版本的 status 更新为 published。
+第三类：存储运行结果的数据 (Result Storage)
+这个表在算法运行前应该是空的（或者不包含目标 version_id 的数据），算法运行后由程序填充。
+1.	schedules (排课结果表):
+o	这是您遗传算法的最终输出。
+o	当算法找到最优的“染色体”（即一个完整的排课方案）后，您的代码需要解析这个染色体，并将每一条“基因”（即一个具体的排课安排）作为一条记录插入到 schedules 表中，同时附上本次运行的 version_id。
+三、 后续操作步骤指南（从准备到优化的全流程）
+
+步骤 1：确认基础与任务数据是否完整
+1. 基础静态表应具备：campuses / departments / majors / classes / teachers / courses / classrooms / classroom_features / classroom_has_features
+2. 学期任务表必须填充：course_offerings / offering_classes / offering_teachers / teaching_tasks
+3. 可选增强：offering_weeks（若涉及非全周或单双周）、teaching_groups（分班）、offering_requires_features（特殊设施）、teacher_blackout_times（硬约束）、teacher_preferences（软约束）、task_relation_constraints（高级偏好）
+4. 快速检测空表：
+   SELECT 'course_offerings' tbl, COUNT(*) cnt FROM course_offerings WHERE semester='2025-2026-1'
+   UNION ALL SELECT 'teaching_tasks', COUNT(*) FROM teaching_tasks
+   UNION ALL SELECT 'offering_teachers', COUNT(*) FROM offering_teachers
+   UNION ALL SELECT 'offering_classes', COUNT(*) FROM offering_classes;
+
+步骤 2：为本次排课创建版本
+INSERT INTO schedule_versions(semester, version_name, status, description, created_by)
+VALUES ('2025-2026-1','2025秋第一轮草案','draft','自动算法初始版本','admin');
+记录生成的 version_id（假设为 3）。
+
+步骤 3：配置环境变量（PowerShell 示例）
+$env:DB_HOST="localhost"
+$env:DB_PORT="3306"
+$env:DB_USER="root"
+$env:DB_PASSWORD="123456"
+$env:DB_NAME="paike2"
+
+步骤 4：基础质量核查（运行前）
+1. teaching_tasks 中 slots_count 仅使用 2 或 3（或与 TIME_WINDOWS 定义匹配）。
+2. 检查是否存在无教师的任务：
+   SELECT t.task_id FROM teaching_tasks t
+   LEFT JOIN offering_teachers ot ON t.offering_id=ot.offering_id
+   WHERE ot.teacher_id IS NULL;
+3. 检查无班级绑定的开课（除非是面向公共群体）：
+   SELECT o.offering_id FROM course_offerings o
+   LEFT JOIN offering_classes c ON o.offering_id=c.offering_id
+   WHERE o.semester='2025-2026-1' GROUP BY o.offering_id HAVING COUNT(c.class_id)=0;
+
+步骤 5：试运行算法
+python suan2.py --semester 2025-2026-1 --version 3 --population 50 --generations 120
+若种群收敛慢，可先用较小 generations 验证流程。
+
+步骤 6：查看结果
+SELECT * FROM schedules WHERE version_id=3 ORDER BY week_day,start_slot;
+统计覆盖率：
+SELECT COUNT(*) 已排, (SELECT COUNT(*) FROM teaching_tasks t
+ JOIN course_offerings o ON t.offering_id=o.offering_id
+ WHERE o.semester='2025-2026-1') 任务总数
+FROM schedules WHERE version_id=3;
+
+步骤 7：检测硬冲突（理论上算法已避免，若出现需排查数据或窗口设置）
+-- 教师同一时间重复
+SELECT s.week_day,s.start_slot,s.classroom_id,ot.teacher_id,COUNT(*) cnt
+FROM schedules s
+JOIN teaching_tasks tt ON s.task_id=tt.task_id
+JOIN offering_teachers ot ON tt.offering_id=ot.offering_id
+WHERE s.version_id=3
+GROUP BY s.week_day,s.start_slot,ot.teacher_id
+HAVING cnt>1;
+-- 班级冲突
+SELECT s.week_day,s.start_slot,oc.class_id,COUNT(*) cnt
+FROM schedules s
+JOIN teaching_tasks tt ON s.task_id=tt.task_id
+JOIN offering_classes oc ON tt.offering_id=oc.offering_id
+WHERE s.version_id=3
+GROUP BY s.week_day,s.start_slot,oc.class_id
+HAVING cnt>1;
+
+步骤 8：分析软约束质量
+1. 教师偏好命中率（示例：统计 PREFERRED 安排在偏好区的比例）
+SELECT tp.teacher_id, tp.preference_type,
+ SUM(CASE WHEN (s.week_day=tp.weekday
+      AND NOT (s.end_slot<tp.start_slot OR s.start_slot>tp.end_slot)) THEN 1 ELSE 0 END) 命中,
+ COUNT(*) 相关任务数
+FROM teacher_preferences tp
+JOIN teaching_tasks tt ON tt.offering_id=tp.offering_id
+LEFT JOIN schedules s ON s.task_id=tt.task_id AND s.version_id=3
+GROUP BY tp.teacher_id,tp.preference_type;
+2. 低利用率教室
+SELECT s.classroom_id, c.capacity,
+ ROUND(AVG(sc.student_count_used),1) 平均人数,
+ ROUND(AVG(sc.student_count_used)/c.capacity,3) 平均利用率
+FROM schedules s
+JOIN teaching_tasks tt ON s.task_id=tt.task_id
+JOIN classrooms c ON s.classroom_id=c.classroom_id
+JOIN (
+  SELECT t.task_id,
+   IFNULL(g.student_count,
+     IFNULL(o.student_count_estimate,
+       (SELECT SUM(cl.student_count) FROM offering_classes oc
+        JOIN classes cl ON oc.class_id=cl.class_id WHERE oc.offering_id=t.offering_id)
+     )
+   ) student_count_used
+  FROM teaching_tasks t
+  JOIN course_offerings o ON t.offering_id=o.offering_id
+  LEFT JOIN teaching_groups g ON t.group_id=g.group_id
+) sc ON sc.task_id=tt.task_id
+WHERE s.version_id=3
+GROUP BY s.classroom_id
+ORDER BY 平均利用率 ASC LIMIT 10;
+
+步骤 9：调参与再运行策略
+1. 若硬冲突未消除：检查 TIME_WINDOWS 与 slots_count 是否矛盾 / 教师数量是否不足。
+2. 若偏好满足率低：增大 generations / population，提高多样性。
+3. 若收敛慢：降低 MUTATION_RATE 或调大 TOURNAMENT_K。
+4. 可做多轮运行，保留 best fitness ≥ 期望阈值的结果。
+
+步骤 10：参数调优经验
+- 小实例：pop=40,generations=80
+- 中实例（数百任务）：pop=80~120,generations=200~400
+- 大实例：考虑并行（多进程独立运行不同随机种子取最优）
+
+步骤 11：版本发布
+满意后：
+UPDATE schedule_versions SET status='published' WHERE version_id=3;
+历史方案：
+UPDATE schedule_versions SET status='archived' WHERE version_id=OLD_ID;
+
+步骤 12：增量更新流程（某课程临时变更）
+1. 删除该 offering 相关任务在 schedules 中的记录：
+   DELETE s FROM schedules s
+   JOIN teaching_tasks tt ON s.task_id=tt.task_id
+   WHERE s.version_id=3 AND tt.offering_id=<OID>;
+2. 针对该 offering 子问题单独重排（未来可加局部重排脚本）；
+3. 或整体重跑（保持相同 version_id 会覆盖原记录）。
+
+步骤 13：常见问题排查
+A. 全部任务未排出：teaching_tasks 为空或 semester 传参不匹配。
+B. 大量硬冲突：slots_count 与 TIME_WINDOWS 不适配；班级或教师资源不足。
+C. 利用率低：可增加按人数对教室按容量排序的启发式（后续可在 seed 阶段改进）。
+D. 偏好无效：teacher_preferences 中 weekday/start_slot/end_slot 是否 NULL；算法逻辑只对有时间范围的记录判定。
+
+步骤 14：建议的后续改进方向
+1. 引入局部搜索（例如模拟退火）对 GA 最优解做二次精炼。
+2. 分离硬/软约束：采用可行性优先策略（先修复硬冲突再比较软分）。
+3. 多目标：使用加权或Pareto前沿（课堂集中度、利用率、偏好满足率）。
+4. 加入周次维度（offering_weeks）后：为 Gene 增加 weeks bitset 或引用模式，适应度需检测跨周教师冲突。
+5. 引入缓存（教师/班级/教室矩阵）减少 fitness 中重复计算。
+
+步骤 15：生产部署提示
+1. 建议使用 virtualenv 并固定依赖版本（pymysql）。
+2. 为 suan2.py 增加日志（logging + 输出 best_fit、冲突计数）。
+3. 对 schedules 增加归档/导出（CSV/Excel）功能。
+4. 定期备份 schema + 数据（mysqldump）。
+5. 大实例优化：为 schedules(version_id, week_day, start_slot) 建组合索引辅助查询。
+
+附：快速统计冲突与适应度（可扩展）
+-- 粗略统计教师跨校区天数
+SELECT teacher_id, week_day, COUNT(DISTINCT campus_id) campus_cnt
+FROM (
+  SELECT ot.teacher_id, s.week_day, cr.campus_id
+  FROM schedules s
+  JOIN teaching_tasks tt ON s.task_id=tt.task_id
+  JOIN offering_teachers ot ON tt.offering_id=ot.offering_id
+  JOIN classrooms cr ON s.classroom_id=cr.classroom_id
+  WHERE s.version_id=3
+) t GROUP BY teacher_id, week_day HAVING campus_cnt>1;
+
+完成以上流程后，即可形成“准备→运行→评估→调优→发布”的闭环。
+
+四、 快速核查清单（可打印）
+[ ] 所有 tasks 对应的 offering 存在且 semester 正确
+[ ] 每个 offering 至少 1 名教师
+[ ] slots_count 与 TIME_WINDOWS 匹配
+[ ] version_id 已创建且 status=draft
+[ ] teacher_blackout_times 已填硬约束
+[ ] teacher_preferences 已填优先项
+[ ] 运行日志显示 best fitness 正在提升
+[ ] schedules 里记录数 = teaching_tasks 数（或接近）
+[ ] 没有硬冲突查询结果
+[ ] 利用率与偏好满足率达到预期
+[ ] 发布版本状态更新为 published
+
+（至此，你可以开始多轮迭代与扩展开发）
+
+下面从多个角度列出当前算法可能存在的缺点/风险，并给出对应的缓解或改进建议。每一条尽量做到可操作、优先级明确，便于在后续迭代中采纳。
+
+一、教师跨年级/跨班任教导致的冲突（您已指出）
+
+问题：教师可能同时被排到不同年级或分班的重叠时段（尤其在合班/分班场景下容易发生）。
+风险：隐性冲突、教学质量下降、调度不可行。
+缓解：
+在数据模型中显式记录教师在不同年级/教学组的隶属与优先级；把“同一教师同时间不同年级”设为硬约束或高权重软约束。
+在生成与变异阶段强制检查教师-班级冲突（early pruning）。
+增加基于教师角色的资源类型（例如：主讲/助教/指导），避免把同一教师同时分配为不同角色的主课。
+二、多校区通勤/时间留白不足
+
+问题：同一教师在一天内被安排在不同校区，未考虑通勤时间。
+风险：实际无法按时到课、教学延误。
+缓解：
+建模“校区-校区通勤时间矩阵”，把通勤时间加入硬约束或惩罚函数（例如：两堂课间隔 < 通勤时间 + 缓冲则惩罚/禁排）。
+优先按校区聚类生成同一教师同日课程（已部分实现为软约束，可提升为更强的软/硬约束）。
+三、任课资格/角色未严格建模（“必须指定老师教某个班”）
+
+问题：无法保证特定课由固定教师授课（或必须由资格教师授课）。
+缓解：
+在TeachingTask中引入required_teacher_id或资格列表，初始化时固定分配或在适应度中以极大惩罚强制执行。
+在初始化阶段对必须指派的任务生成确定性基因（不参与交叉/变异或仅小概率变异）。
+四、学生个体选课与选修冲突未充分模拟
+
+问题：选修学生群体跨课程的冲突依赖复杂（学生个人选课表不是简单班级层面的约束）。
+风险：部分学生出现选课冲突。
+缓解：
+支持按学生群体（或学生选课样本）建模冲突图，加入冲突惩罚。
+支持“关键选课组合”的硬性约束（例如必选/冲突课程组）。
+五、任务关系约束（间隔/先后/同周天）覆盖不全
+
+问题：已有实现但可能缺覆盖（如“至少间隔一天 / 必须在同一周内完成”）。
+缓解：
+扩展 task_relation_constraints 类型与判定器（例如：min_gap_days、same_week、before/after）。
+在适应度评估中统一调用关系检查函数并给出可解释的违例报告。
+六、算法的可解释性与人工调度可接受性
+
+问题：遗传算法给出的方案对于教务人员不够直观或不可解释（为何某教师被安排成那样）。
+缓解：
+生成可读的调度报告（按教师/班级/教室视角），并输出违反的软约束与改进建议。
+提供“手动冻结/锁定某几条排课”的接口，允许人工微调后局部重排。
+七、性能与可扩展性问题
+
+问题：数据规模扩大后（数千任务）当前GA参数/实现可能耗时或内存不足。
+缓解：
+智能初始化（启发式排难课）、分层排课（先核心再选修）、并行评估（多进程/GPU）和局部搜索混合（memetic）。
+增量式调度：新增/变更课程只重排受影响子集。
+八、参数敏感性与收敛风险（局部最优）
+
+问题：适应度权重、交叉/变异率等参数影响大，易停滞或陷入局部最优。
+缓解：
+自适应参数策略（根据停滞调整变异率）、多次随机重启、混合多目标方法（NSGA-II）或模拟退火混合。
+增加早停/多目标监控并输出收敛曲线方便调参。
+九、数据质量与一致性依赖高
+
+问题：数据库中缺失/错误字段（如教室容量、教师黑名单等）会导致不可预期结果或失败。
+缓解：
+强化 verify_data.py 做全面校验（字段、外键、数值范围、周次一致性）。
+在加载阶段对关键数据缺失采用默认值或阻断并明确报错。
+十、软/硬约束边界的不明确导致误判
+
+问题：一些实际上应为硬约束的要求被当成软约束（或相反），影响可行性或算法灵活性。
+缓解：
+与教务人员一起梳理约束分类表（硬约束须强制执行，软约束给出权重）。
+在配置中暴露权重并支持运行时调整与A/B测试。
+十一、运行/版本管理与回滚
+
+问题：一次完整重排后若需要回滚或比较多个版本管理不便。
+缓解：
+使用 schedule_versions + schedules 的版本化机制，操作前做快照，允许差异比对与回滚。
+记录运行参数与最佳个体快照用于审计。
+十二、法律/合同与教师满意度（非技术）
+
+问题：算法可能导致教师工作量或时段安排超出合同期望。
+缓解：
+在适应度中增加公平性指标（工作量均衡、连续教学时长限制）。
+将重要的人力资源条款纳入硬约束（不得超过周课时、不得最晚排到晚段等）。
+优先级建议（短期→中期→长期）
+
+短期（必须）：修正教师跨班冲突约束、加入通勤时间、明确硬约束列表并在初始化阶段应用固定分配。
+中期：智能初始化/分层排课、任务关系约束全面实现、可解释性与人工冻结功能。
+长期：多目标优化、混合局部搜索、并行化与增量式排课、教师满意度公平性优化。
+简短结论
+
+当前算法框架可行，但在“教师多角色/跨年级”、通勤与资格约束、选课冲突与任务关系等方面仍需加强。建议先把最容易导致不可行性的约束（教师同时间跨班、跨校区通勤、固定教师）提升为硬约束或在初始化时确定，从而在后续优化上节省大量调试成本。
