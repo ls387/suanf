@@ -15,7 +15,7 @@ def connect_db():
         host="localhost",
         user="root",
         password="123456",
-        database="paike-c",
+        database="paike2",
         charset="utf8mb4",
     )
 

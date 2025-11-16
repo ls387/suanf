@@ -62,7 +62,7 @@ pip install pymysql
 ### 1. 创建数据库
 
 ```sql
-CREATE DATABASE `paike-c` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE `paike2` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
 ### 2. 执行表结构 SQL
@@ -76,7 +76,7 @@ CREATE DATABASE `paike-c` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 - Host: localhost
 - User: root
 - Password: 123456
-- Database: paike-c
+- Database: paike2
 
 可通过环境变量自定义：
 
@@ -85,13 +85,13 @@ CREATE DATABASE `paike-c` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 $env:DB_HOST="localhost"
 $env:DB_USER="root"
 $env:DB_PASSWORD="123456"
-$env:DB_NAME="paike-c"
+$env:DB_NAME="paike2"
 
 # Linux/Mac
 export DB_HOST="localhost"
 export DB_USER="root"
 export DB_PASSWORD="123456"
-export DB_NAME="paike-c"
+export DB_NAME="paike2"
 ```
 
 ## 快速开始

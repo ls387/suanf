@@ -47,8 +47,10 @@ class Major:
     """专业"""
 
     major_id: str
-    major_name: str
-    department_id: str
+    major_name: Optional[str] = None
+    department_id: Optional[str] = None
+    education_level: Optional[str] = None
+    notes: Optional[str] = None
 
 
 @dataclass
@@ -60,6 +62,8 @@ class Class:
     grade: int
     student_count: Optional[int]
     major_id: str
+    # 可选的学制字段，对应数据库中的 education_system 列
+    education_system: Optional[str] = None
 
 
 @dataclass
@@ -81,6 +85,8 @@ class Course:
     course_name: str
     credits: float
     total_hours: int
+    # 课程备注，对应数据库 courses.notes，可为空
+    notes: Optional[str] = None
 
 
 @dataclass
@@ -119,6 +125,10 @@ class CourseOffering:
     course_id: str
     course_nature: CourseNature
     student_count_estimate: Optional[int] = None
+    # 起始周、结束周和周次模式，对应 course_offerings 表中的列
+    start_week: Optional[int] = None
+    end_week: Optional[int] = None
+    week_pattern: Optional[str] = None
 
 
 @dataclass
@@ -253,3 +263,23 @@ def get_valid_time_slots(slots_count: int) -> List[tuple]:
         return TIME_WINDOWS[slots_count]
     else:
         raise ValueError(f"不支持的课程节数: {slots_count}")
+
+
+@dataclass
+class TaskRelation:
+    """
+    任务关系约束（task_relation_constraints）
+    relation_type: e.g. 'min_gap_days'|'same_week'|'before'|'after'|'not_same_day'
+    min_gap_days: 如果 relation_type == 'min_gap_days'，要求两次任务间隔至少的天数
+    penalty: 违反时的惩罚分数（可为软约束）；若为硬约束，可在适应度中设置大惩罚
+    """
+
+    relation_id: int
+    offering_id: Optional[int]  # 关联的开课计划（若适用）
+    task_id_from: int  # 约束起点任务 id
+    task_id_to: int  # 约束目标任务 id
+    relation_type: str  # 关系类型
+    min_gap_days: Optional[int] = None
+    same_week: Optional[bool] = None
+    penalty: Optional[int] = 0
+    notes: Optional[str] = None

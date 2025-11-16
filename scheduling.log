@@ -1,0 +1,321 @@
+2025-11-16 19:16:52,617 - __main__ - INFO - ============================================================
+2025-11-16 19:16:52,617 - __main__ - INFO - 智能排课系统启动
+2025-11-16 19:16:52,617 - __main__ - INFO - ============================================================
+2025-11-16 19:16:52,617 - __main__ - INFO - 版本ID: 1
+2025-11-16 19:16:52,618 - __main__ - INFO - 遗传算法配置: {'population_size': 150, 'generations': 300, 'crossover_rate': 0.8, 'mutation_rate': 0.1, 'tournament_size': 5, 'elitism_size': 10, 'max_stagnation': 50}
+2025-11-16 19:16:52,618 - __main__ - INFO - 连接数据库: localhost:paike2
+2025-11-16 19:16:52,649 - db_connector - INFO - 数据库连接成功
+2025-11-16 19:16:52,650 - __main__ - ERROR - 排课版本 1 不存在
+2025-11-16 19:16:52,651 - __main__ - ERROR - 排课任务执行失败！
+2025-11-16 19:16:52,651 - db_connector - INFO - 数据库连接已关闭
+2025-11-16 19:20:07,008 - __main__ - INFO - ============================================================
+2025-11-16 19:20:07,010 - __main__ - INFO - 智能排课系统启动
+2025-11-16 19:20:07,010 - __main__ - INFO - ============================================================
+2025-11-16 19:20:07,010 - __main__ - INFO - 版本ID: 1
+2025-11-16 19:20:07,010 - __main__ - INFO - 遗传算法配置: {'population_size': 150, 'generations': 300, 'crossover_rate': 0.8, 'mutation_rate': 0.1, 'tournament_size': 5, 'elitism_size': 10, 'max_stagnation': 50}
+2025-11-16 19:20:07,011 - __main__ - INFO - 连接数据库: localhost:paike2
+2025-11-16 19:20:07,027 - db_connector - INFO - 数据库连接成功
+2025-11-16 19:20:07,030 - __main__ - ERROR - 排课版本 1 不存在
+2025-11-16 19:20:07,031 - __main__ - ERROR - 排课任务执行失败！
+2025-11-16 19:20:07,031 - db_connector - INFO - 数据库连接已关闭
+2025-11-16 19:21:25,811 - __main__ - INFO - ============================================================
+2025-11-16 19:21:25,812 - __main__ - INFO - 智能排课系统启动
+2025-11-16 19:21:25,812 - __main__ - INFO - ============================================================
+2025-11-16 19:21:25,812 - __main__ - INFO - 版本ID: 1
+2025-11-16 19:21:25,812 - __main__ - INFO - 遗传算法配置: {'population_size': 150, 'generations': 300, 'crossover_rate': 0.8, 'mutation_rate': 0.1, 'tournament_size': 5, 'elitism_size': 10, 'max_stagnation': 50}
+2025-11-16 19:21:25,813 - __main__ - INFO - 连接数据库: localhost:paike2
+2025-11-16 19:21:25,825 - db_connector - INFO - 数据库连接成功
+2025-11-16 19:21:25,826 - __main__ - INFO - 验证版本成功: 测试版本1 (2025-2026-1)
+2025-11-16 19:21:25,826 - __main__ - INFO - 开始加载学期 2025-2026-1 的数据
+2025-11-16 19:21:25,826 - db_connector - INFO - 开始加载学期 2025-2026-1 的排课数据
+2025-11-16 19:21:25,829 - __main__ - ERROR - 排课过程中发生错误: Major.__init__() got an unexpected keyword argument 'notes'
+2025-11-16 19:21:25,831 - __main__ - ERROR - Traceback (most recent call last):
+  File "D:\suanf\suan2.py", line 147, in run_scheduling
+    data = self.data_loader.load_all_data(semester)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\suanf\db_connector.py", line 107, in load_all_data
+    "majors": self._load_majors(),
+              ^^^^^^^^^^^^^^^^^^^
+  File "D:\suanf\db_connector.py", line 143, in _load_majors
+    return {row["major_id"]: Major(**row) for row in rows}
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\suanf\db_connector.py", line 143, in <dictcomp>
+    return {row["major_id"]: Major(**row) for row in rows}
+                             ^^^^^^^^^^^^
+TypeError: Major.__init__() got an unexpected keyword argument 'notes'
+
+2025-11-16 19:21:25,832 - __main__ - ERROR - 排课任务执行失败！
+2025-11-16 19:21:25,832 - db_connector - INFO - 数据库连接已关闭
+2025-11-16 19:27:46,349 - __main__ - INFO - ============================================================
+2025-11-16 19:27:46,350 - __main__ - INFO - 智能排课系统启动
+2025-11-16 19:27:46,350 - __main__ - INFO - ============================================================
+2025-11-16 19:27:46,351 - __main__ - INFO - 版本ID: 1
+2025-11-16 19:27:46,351 - __main__ - INFO - 遗传算法配置: {'population_size': 150, 'generations': 300, 'crossover_rate': 0.8, 'mutation_rate': 0.1, 'tournament_size': 5, 'elitism_size': 10, 'max_stagnation': 50}
+2025-11-16 19:27:46,351 - __main__ - INFO - 连接数据库: localhost:paike2
+2025-11-16 19:27:46,385 - db_connector - INFO - 数据库连接成功
+2025-11-16 19:27:46,388 - __main__ - INFO - 验证版本成功: 测试版本1 (2025-2026-1)
+2025-11-16 19:27:46,389 - __main__ - INFO - 开始加载学期 2025-2026-1 的数据
+2025-11-16 19:27:46,390 - db_connector - INFO - 开始加载学期 2025-2026-1 的排课数据
+2025-11-16 19:27:46,398 - __main__ - ERROR - 排课过程中发生错误: Class.__init__() got an unexpected keyword argument 'education_system'
+2025-11-16 19:27:46,403 - __main__ - ERROR - Traceback (most recent call last):
+  File "D:\suanf\suan2.py", line 147, in run_scheduling
+    data = self.data_loader.load_all_data(semester)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\suanf\db_connector.py", line 108, in load_all_data
+    "classes": self._load_classes(),
+               ^^^^^^^^^^^^^^^^^^^^
+  File "D:\suanf\db_connector.py", line 149, in _load_classes
+    return {row["class_id"]: Class(**row) for row in rows}
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\suanf\db_connector.py", line 149, in <dictcomp>
+    return {row["class_id"]: Class(**row) for row in rows}
+                             ^^^^^^^^^^^^
+TypeError: Class.__init__() got an unexpected keyword argument 'education_system'
+
+2025-11-16 19:27:46,405 - __main__ - ERROR - 排课任务执行失败！
+2025-11-16 19:27:46,406 - db_connector - INFO - 数据库连接已关闭
+2025-11-16 19:30:15,398 - __main__ - INFO - ============================================================
+2025-11-16 19:30:15,399 - __main__ - INFO - 智能排课系统启动
+2025-11-16 19:30:15,399 - __main__ - INFO - ============================================================
+2025-11-16 19:30:15,399 - __main__ - INFO - 版本ID: 1
+2025-11-16 19:30:15,399 - __main__ - INFO - 遗传算法配置: {'population_size': 150, 'generations': 300, 'crossover_rate': 0.8, 'mutation_rate': 0.1, 'tournament_size': 5, 'elitism_size': 10, 'max_stagnation': 50}
+2025-11-16 19:30:15,399 - __main__ - INFO - 连接数据库: localhost:paike2
+2025-11-16 19:30:15,435 - db_connector - INFO - 数据库连接成功
+2025-11-16 19:30:15,437 - __main__ - INFO - 验证版本成功: 测试版本1 (2025-2026-1)
+2025-11-16 19:30:15,437 - __main__ - INFO - 开始加载学期 2025-2026-1 的数据
+2025-11-16 19:30:15,437 - db_connector - INFO - 开始加载学期 2025-2026-1 的排课数据
+2025-11-16 19:30:15,445 - __main__ - ERROR - 排课过程中发生错误: Course.__init__() got an unexpected keyword argument 'notes'
+2025-11-16 19:30:15,446 - __main__ - ERROR - Traceback (most recent call last):
+  File "D:\suanf\suan2.py", line 147, in run_scheduling
+    data = self.data_loader.load_all_data(semester)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\suanf\db_connector.py", line 110, in load_all_data
+    "courses": self._load_courses(),
+               ^^^^^^^^^^^^^^^^^^^^
+  File "D:\suanf\db_connector.py", line 163, in _load_courses
+    return {row["course_id"]: Course(**row) for row in rows}
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\suanf\db_connector.py", line 163, in <dictcomp>
+    return {row["course_id"]: Course(**row) for row in rows}
+                              ^^^^^^^^^^^^^
+TypeError: Course.__init__() got an unexpected keyword argument 'notes'
+
+2025-11-16 19:30:15,446 - __main__ - ERROR - 排课任务执行失败！
+2025-11-16 19:30:15,447 - db_connector - INFO - 数据库连接已关闭
+2025-11-16 19:31:20,777 - __main__ - INFO - ============================================================
+2025-11-16 19:31:20,777 - __main__ - INFO - 智能排课系统启动
+2025-11-16 19:31:20,778 - __main__ - INFO - ============================================================
+2025-11-16 19:31:20,778 - __main__ - INFO - 版本ID: 1
+2025-11-16 19:31:20,778 - __main__ - INFO - 遗传算法配置: {'population_size': 150, 'generations': 300, 'crossover_rate': 0.8, 'mutation_rate': 0.1, 'tournament_size': 5, 'elitism_size': 10, 'max_stagnation': 50}
+2025-11-16 19:31:20,778 - __main__ - INFO - 连接数据库: localhost:paike2
+2025-11-16 19:31:20,788 - db_connector - INFO - 数据库连接成功
+2025-11-16 19:31:20,789 - __main__ - INFO - 验证版本成功: 测试版本1 (2025-2026-1)
+2025-11-16 19:31:20,789 - __main__ - INFO - 开始加载学期 2025-2026-1 的数据
+2025-11-16 19:31:20,790 - db_connector - INFO - 开始加载学期 2025-2026-1 的排课数据
+2025-11-16 19:31:20,802 - __main__ - ERROR - 排课过程中发生错误: CourseOffering.__init__() got an unexpected keyword argument 'start_week'
+2025-11-16 19:31:20,804 - __main__ - ERROR - Traceback (most recent call last):
+  File "D:\suanf\suan2.py", line 147, in run_scheduling
+    data = self.data_loader.load_all_data(semester)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\suanf\db_connector.py", line 113, in load_all_data
+    "course_offerings": self._load_course_offerings(semester),
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\suanf\db_connector.py", line 206, in _load_course_offerings
+    offerings[row["offering_id"]] = CourseOffering(**row)
+                                    ^^^^^^^^^^^^^^^^^^^^^
+TypeError: CourseOffering.__init__() got an unexpected keyword argument 'start_week'
+
+2025-11-16 19:31:20,804 - __main__ - ERROR - 排课任务执行失败！
+2025-11-16 19:31:20,804 - db_connector - INFO - 数据库连接已关闭
+2025-11-16 19:33:39,712 - __main__ - INFO - ============================================================
+2025-11-16 19:33:39,712 - __main__ - INFO - 智能排课系统启动
+2025-11-16 19:33:39,713 - __main__ - INFO - ============================================================
+2025-11-16 19:33:39,713 - __main__ - INFO - 版本ID: 1
+2025-11-16 19:33:39,713 - __main__ - INFO - 遗传算法配置: {'population_size': 150, 'generations': 300, 'crossover_rate': 0.8, 'mutation_rate': 0.1, 'tournament_size': 5, 'elitism_size': 10, 'max_stagnation': 50}
+2025-11-16 19:33:39,713 - __main__ - INFO - 连接数据库: localhost:paike2
+2025-11-16 19:33:39,742 - db_connector - INFO - 数据库连接成功
+2025-11-16 19:33:39,745 - __main__ - INFO - 验证版本成功: 测试版本1 (2025-2026-1)
+2025-11-16 19:33:39,746 - __main__ - INFO - 开始加载学期 2025-2026-1 的数据
+2025-11-16 19:33:39,746 - db_connector - INFO - 开始加载学期 2025-2026-1 的排课数据
+2025-11-16 19:33:39,782 - db_connector - ERROR - 查询执行失败: 
+            SELECT tr.task_id, tr.related_task_id, tr.relation_type, 
+                   tr.time_gap, tr.same_day, tr.description
+            FROM task_relations tr
+            JOIN teaching_tasks tt ON tr.task_id = tt.task_id
+            JOIN course_offerings co ON tt.offering_id = co.offering_id
+            WHERE co.semester = %s AND tr.is_active = 1
+            , 错误: (1146, "Table 'paike2.task_relations' doesn't exist")
+2025-11-16 19:33:39,782 - db_connector - WARNING - 无法加载任务关系约束: (1146, "Table 'paike2.task_relations' doesn't exist")
+2025-11-16 19:33:39,782 - db_connector - INFO - 开始填充教学任务详细信息
+2025-11-16 19:33:39,788 - db_connector - INFO - 教学任务详细信息填充完成
+2025-11-16 19:33:39,790 - db_connector - INFO - 所有数据加载完成
+2025-11-16 19:33:39,790 - __main__ - INFO - 开始验证数据完整性
+2025-11-16 19:33:39,790 - __main__ - ERROR - 数据完整性检查失败:
+2025-11-16 19:33:39,790 - __main__ - ERROR -   - 有 2 个任务没有分配教师
+2025-11-16 19:33:39,790 - __main__ - ERROR - 排课任务执行失败！
+2025-11-16 19:33:39,791 - db_connector - INFO - 数据库连接已关闭
+2025-11-16 19:35:02,415 - __main__ - INFO - ============================================================
+2025-11-16 19:35:02,417 - __main__ - INFO - 智能排课系统启动
+2025-11-16 19:35:02,418 - __main__ - INFO - ============================================================
+2025-11-16 19:35:02,418 - __main__ - INFO - 版本ID: 1
+2025-11-16 19:35:02,418 - __main__ - INFO - 遗传算法配置: {'population_size': 150, 'generations': 300, 'crossover_rate': 0.8, 'mutation_rate': 0.1, 'tournament_size': 5, 'elitism_size': 10, 'max_stagnation': 50}
+2025-11-16 19:35:02,418 - __main__ - INFO - 连接数据库: localhost:paike2
+2025-11-16 19:35:02,429 - db_connector - INFO - 数据库连接成功
+2025-11-16 19:35:02,430 - __main__ - INFO - 验证版本成功: 测试版本1 (2025-2026-1)
+2025-11-16 19:35:02,431 - __main__ - INFO - 开始加载学期 2025-2026-1 的数据
+2025-11-16 19:35:02,433 - db_connector - INFO - 开始加载学期 2025-2026-1 的排课数据
+2025-11-16 19:35:02,453 - db_connector - ERROR - 查询执行失败: 
+            SELECT tr.task_id, tr.related_task_id, tr.relation_type, 
+                   tr.time_gap, tr.same_day, tr.description
+            FROM task_relations tr
+            JOIN teaching_tasks tt ON tr.task_id = tt.task_id
+            JOIN course_offerings co ON tt.offering_id = co.offering_id
+            WHERE co.semester = %s AND tr.is_active = 1
+            , 错误: (1146, "Table 'paike2.task_relations' doesn't exist")
+2025-11-16 19:35:02,453 - db_connector - WARNING - 无法加载任务关系约束: (1146, "Table 'paike2.task_relations' doesn't exist")
+2025-11-16 19:35:02,454 - db_connector - INFO - 开始填充教学任务详细信息
+2025-11-16 19:35:02,461 - db_connector - INFO - 教学任务详细信息填充完成
+2025-11-16 19:35:02,463 - db_connector - INFO - 所有数据加载完成
+2025-11-16 19:35:02,464 - __main__ - INFO - 开始验证数据完整性
+2025-11-16 19:35:02,465 - __main__ - INFO - 数据完整性检查通过
+2025-11-16 19:35:02,467 - __main__ - INFO -   - 教学任务: 153 个
+2025-11-16 19:35:02,468 - __main__ - INFO -   - 教师: 243 人
+2025-11-16 19:35:02,469 - __main__ - INFO -   - 教室: 133 间
+2025-11-16 19:35:02,470 - __main__ - INFO -   - 班级: 80 个
+2025-11-16 19:35:02,471 - __main__ - INFO - 初始化遗传算法
+2025-11-16 19:35:02,472 - genetic_algorithm - INFO - 开始预处理数据
+2025-11-16 19:35:02,473 - genetic_algorithm - INFO - 任务优先级排序完成：长课程优先，必修课优先
+2025-11-16 19:35:02,474 - genetic_algorithm - INFO - 预处理完成：153个任务，133个教室
+2025-11-16 19:35:02,475 - __main__ - INFO - 开始运行遗传算法
+2025-11-16 19:35:02,476 - genetic_algorithm - INFO - 开始遗传算法进化
+2025-11-16 19:35:36,047 - __main__ - ERROR - 排课过程中发生错误: 'penalty_scores'
+2025-11-16 19:35:36,050 - __main__ - ERROR - Traceback (most recent call last):
+  File "D:\suanf\suan2.py", line 159, in run_scheduling
+    best_solution = ga.evolve()
+                    ^^^^^^^^^^^
+  File "D:\suanf\genetic_algorithm.py", line 812, in evolve
+    fitness_scores = [self.fitness(individual) for individual in population]
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\suanf\genetic_algorithm.py", line 812, in <listcomp>
+    fitness_scores = [self.fitness(individual) for individual in population]
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\suanf\genetic_algorithm.py", line 450, in fitness
+    score += self._check_hard_constraints(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\suanf\genetic_algorithm.py", line 483, in _check_hard_constraints
+    penalty += self.config["penalty_scores"][conflict_type]
+               ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+KeyError: 'penalty_scores'
+
+2025-11-16 19:35:36,051 - __main__ - ERROR - 排课任务执行失败！
+2025-11-16 19:35:36,051 - db_connector - INFO - 数据库连接已关闭
+2025-11-16 19:37:55,192 - __main__ - INFO - ============================================================
+2025-11-16 19:37:55,193 - __main__ - INFO - 智能排课系统启动
+2025-11-16 19:37:55,193 - __main__ - INFO - ============================================================
+2025-11-16 19:37:55,195 - __main__ - INFO - 版本ID: 1
+2025-11-16 19:37:55,195 - __main__ - INFO - 遗传算法配置: {'population_size': 150, 'generations': 300, 'crossover_rate': 0.8, 'mutation_rate': 0.1, 'tournament_size': 5, 'elitism_size': 10, 'max_stagnation': 50}
+2025-11-16 19:37:55,195 - __main__ - INFO - 连接数据库: localhost:paike2
+2025-11-16 19:37:55,218 - db_connector - INFO - 数据库连接成功
+2025-11-16 19:37:55,221 - __main__ - INFO - 验证版本成功: 测试版本1 (2025-2026-1)
+2025-11-16 19:37:55,222 - __main__ - INFO - 开始加载学期 2025-2026-1 的数据
+2025-11-16 19:37:55,223 - db_connector - INFO - 开始加载学期 2025-2026-1 的排课数据
+2025-11-16 19:37:55,256 - db_connector - ERROR - 查询执行失败: 
+            SELECT tr.task_id, tr.related_task_id, tr.relation_type, 
+                   tr.time_gap, tr.same_day, tr.description
+            FROM task_relations tr
+            JOIN teaching_tasks tt ON tr.task_id = tt.task_id
+            JOIN course_offerings co ON tt.offering_id = co.offering_id
+            WHERE co.semester = %s AND tr.is_active = 1
+            , 错误: (1146, "Table 'paike2.task_relations' doesn't exist")
+2025-11-16 19:37:55,256 - db_connector - WARNING - 无法加载任务关系约束: (1146, "Table 'paike2.task_relations' doesn't exist")
+2025-11-16 19:37:55,256 - db_connector - INFO - 开始填充教学任务详细信息
+2025-11-16 19:37:55,266 - db_connector - INFO - 教学任务详细信息填充完成
+2025-11-16 19:37:55,267 - db_connector - INFO - 所有数据加载完成
+2025-11-16 19:37:55,267 - __main__ - INFO - 开始验证数据完整性
+2025-11-16 19:37:55,267 - __main__ - INFO - 数据完整性检查通过
+2025-11-16 19:37:55,268 - __main__ - INFO -   - 教学任务: 153 个
+2025-11-16 19:37:55,268 - __main__ - INFO -   - 教师: 243 人
+2025-11-16 19:37:55,269 - __main__ - INFO -   - 教室: 133 间
+2025-11-16 19:37:55,269 - __main__ - INFO -   - 班级: 80 个
+2025-11-16 19:37:55,269 - __main__ - INFO - 初始化遗传算法
+2025-11-16 19:37:55,270 - genetic_algorithm - INFO - 开始预处理数据
+2025-11-16 19:37:55,271 - genetic_algorithm - INFO - 任务优先级排序完成：长课程优先，必修课优先
+2025-11-16 19:37:55,272 - genetic_algorithm - INFO - 预处理完成：153个任务，133个教室
+2025-11-16 19:37:55,273 - __main__ - INFO - 开始运行遗传算法
+2025-11-16 19:37:55,273 - genetic_algorithm - INFO - 开始遗传算法进化
+2025-11-16 19:38:02,581 - __main__ - INFO - 用户中断程序
+2025-11-16 19:38:02,582 - db_connector - INFO - 数据库连接已关闭
+2025-11-16 19:39:21,590 - __main__ - INFO - ============================================================
+2025-11-16 19:39:21,590 - __main__ - INFO - 智能排课系统启动
+2025-11-16 19:39:21,590 - __main__ - INFO - ============================================================
+2025-11-16 19:39:21,591 - __main__ - INFO - 版本ID: 1
+2025-11-16 19:39:21,591 - __main__ - INFO - 遗传算法配置: {'population_size': 150, 'generations': 300, 'crossover_rate': 0.8, 'mutation_rate': 0.1, 'tournament_size': 5, 'elitism_size': 10, 'max_stagnation': 50}
+2025-11-16 19:39:21,591 - __main__ - INFO - 连接数据库: localhost:paike2
+2025-11-16 19:39:21,633 - db_connector - INFO - 数据库连接成功
+2025-11-16 19:39:21,635 - __main__ - INFO - 验证版本成功: 测试版本1 (2025-2026-1)
+2025-11-16 19:39:21,636 - __main__ - INFO - 开始加载学期 2025-2026-1 的数据
+2025-11-16 19:39:21,637 - db_connector - INFO - 开始加载学期 2025-2026-1 的排课数据
+2025-11-16 19:39:21,681 - db_connector - ERROR - 查询执行失败: 
+            SELECT tr.task_id, tr.related_task_id, tr.relation_type, 
+                   tr.time_gap, tr.same_day, tr.description
+            FROM task_relations tr
+            JOIN teaching_tasks tt ON tr.task_id = tt.task_id
+            JOIN course_offerings co ON tt.offering_id = co.offering_id
+            WHERE co.semester = %s AND tr.is_active = 1
+            , 错误: (1146, "Table 'paike2.task_relations' doesn't exist")
+2025-11-16 19:39:21,681 - db_connector - WARNING - 无法加载任务关系约束: (1146, "Table 'paike2.task_relations' doesn't exist")
+2025-11-16 19:39:21,682 - db_connector - INFO - 开始填充教学任务详细信息
+2025-11-16 19:39:21,692 - db_connector - INFO - 教学任务详细信息填充完成
+2025-11-16 19:39:21,692 - db_connector - INFO - 所有数据加载完成
+2025-11-16 19:39:21,692 - __main__ - INFO - 开始验证数据完整性
+2025-11-16 19:39:21,692 - __main__ - INFO - 数据完整性检查通过
+2025-11-16 19:39:21,693 - __main__ - INFO -   - 教学任务: 153 个
+2025-11-16 19:39:21,693 - __main__ - INFO -   - 教师: 243 人
+2025-11-16 19:39:21,693 - __main__ - INFO -   - 教室: 133 间
+2025-11-16 19:39:21,694 - __main__ - INFO -   - 班级: 80 个
+2025-11-16 19:39:21,694 - __main__ - INFO - 初始化遗传算法
+2025-11-16 19:39:21,695 - genetic_algorithm - INFO - 开始预处理数据
+2025-11-16 19:39:21,697 - genetic_algorithm - INFO - 任务优先级排序完成：长课程优先，必修课优先
+2025-11-16 19:39:21,697 - genetic_algorithm - INFO - 预处理完成：153个任务，133个教室
+2025-11-16 19:39:21,698 - __main__ - INFO - 开始运行遗传算法
+2025-11-16 19:39:21,698 - genetic_algorithm - INFO - 开始遗传算法进化
+2025-11-16 19:39:54,351 - genetic_algorithm - INFO - 第 0 代，新的最佳适应度: -1175000.00
+2025-11-16 19:39:54,361 - genetic_algorithm - INFO - 第 0 代完成，当前最佳适应度: -1175000.00
+2025-11-16 19:39:54,435 - genetic_algorithm - INFO - 第 1 代，新的最佳适应度: -1160000.00
+2025-11-16 19:39:54,510 - genetic_algorithm - INFO - 第 2 代，新的最佳适应度: -1125000.00
+2025-11-16 19:39:54,604 - genetic_algorithm - INFO - 第 3 代，新的最佳适应度: -1110000.00
+2025-11-16 19:39:54,678 - genetic_algorithm - INFO - 第 4 代，新的最佳适应度: -1100000.00
+2025-11-16 19:39:54,740 - genetic_algorithm - INFO - 第 5 代，新的最佳适应度: -1090000.00
+2025-11-16 19:39:54,900 - genetic_algorithm - INFO - 第 7 代，新的最佳适应度: -1075000.00
+2025-11-16 19:39:54,967 - genetic_algorithm - INFO - 第 8 代，新的最佳适应度: -1065000.00
+2025-11-16 19:39:55,033 - genetic_algorithm - INFO - 第 9 代，新的最佳适应度: -1055000.00
+2025-11-16 19:39:55,115 - genetic_algorithm - INFO - 第 10 代，新的最佳适应度: -1050000.00
+2025-11-16 19:39:55,437 - genetic_algorithm - INFO - 第 14 代，新的最佳适应度: -1045000.00
+2025-11-16 19:39:55,866 - genetic_algorithm - INFO - 第 20 代，新的最佳适应度: -1040000.00
+2025-11-16 19:39:55,877 - genetic_algorithm - INFO - 第 20 代完成，当前最佳适应度: -1040000.00
+2025-11-16 19:39:56,201 - genetic_algorithm - INFO - 第 25 代，新的最佳适应度: -1035000.00
+2025-11-16 19:39:56,349 - genetic_algorithm - INFO - 第 27 代，新的最佳适应度: -1030000.00
+2025-11-16 19:39:56,615 - genetic_algorithm - INFO - 第 31 代，新的最佳适应度: -1025000.00
+2025-11-16 19:39:57,241 - genetic_algorithm - INFO - 第 40 代完成，当前最佳适应度: -1025000.00
+2025-11-16 19:39:57,464 - genetic_algorithm - INFO - 第 43 代，新的最佳适应度: -1015000.00
+2025-11-16 19:39:57,532 - genetic_algorithm - INFO - 第 44 代，新的最佳适应度: -995000.00
+2025-11-16 19:39:58,514 - genetic_algorithm - INFO - 第 60 代完成，当前最佳适应度: -995000.00
+2025-11-16 19:39:59,743 - genetic_algorithm - INFO - 第 77 代，新的最佳适应度: -985000.00
+2025-11-16 19:39:59,942 - genetic_algorithm - INFO - 第 80 代完成，当前最佳适应度: -985000.00
+2025-11-16 19:40:00,069 - genetic_algorithm - INFO - 第 82 代，新的最佳适应度: -975000.00
+2025-11-16 19:40:01,289 - genetic_algorithm - INFO - 第 100 代完成，当前最佳适应度: -975000.00
+2025-11-16 19:40:02,634 - genetic_algorithm - INFO - 第 120 代完成，当前最佳适应度: -975000.00
+2025-11-16 19:40:03,454 - genetic_algorithm - INFO - 算法停滞 50 代，提前结束
+2025-11-16 19:40:03,516 - genetic_algorithm - INFO - 进化完成，最终最佳适应度: -975000.00
+2025-11-16 19:40:03,517 - __main__ - INFO - 保存排课结果
+2025-11-16 19:40:03,517 - db_connector - INFO - 开始保存排课结果，版本ID: 1
+2025-11-16 19:40:03,526 - db_connector - INFO - 批量插入 153 条记录成功
+2025-11-16 19:40:03,527 - db_connector - INFO - 成功保存 153 条排课结果
+2025-11-16 19:40:03,527 - __main__ - INFO - 生成排课统计报告
+2025-11-16 19:40:03,527 - __main__ - INFO - 排课覆盖率: 100.0% (153/153)
+2025-11-16 19:40:03,527 - __main__ - WARNING - 发现班级冲突: 13 处
+2025-11-16 19:40:03,528 - __main__ - INFO - 教室平均利用率: 84.0%
+2025-11-16 19:40:03,528 - __main__ - WARNING - 发现 30 间教室利用率过低(<50%)
+2025-11-16 19:40:03,528 - __main__ - INFO - 排课完成，总耗时: 41.89 秒
+2025-11-16 19:40:03,528 - __main__ - INFO - 排课任务完成成功！
+2025-11-16 19:40:03,529 - db_connector - INFO - 数据库连接已关闭

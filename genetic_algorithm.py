@@ -20,7 +20,13 @@ class SchedulingGeneticAlgorithm:
 
     def __init__(self, data: Dict, config: Dict = None):
         self.data = data
-        self.config = config or self._default_config()
+
+        # 基于默认配置，叠加外部传入的配置，避免覆盖掉 penalty_scores 等字段
+        base_config = self._default_config()
+        if config:
+            for key, value in config.items():
+                base_config[key] = value
+        self.config = base_config
 
         # 预处理数据
         self._preprocess_data()
