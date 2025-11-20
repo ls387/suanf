@@ -1,5 +1,5 @@
 -- MySQL dump 10.13  Distrib 9.2.0, for Win64 (x86_64)
---
+-- 
 -- Host: localhost    Database: paike2
 -- ------------------------------------------------------
 -- Server version	9.2.0
